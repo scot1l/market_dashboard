@@ -4,6 +4,8 @@
 
 Static stock dashboard with daily auto-refresh via GitLab CI/CD (Yahoo Finance), hosted on GitLab Pages.
 
+**Data Updates**: Mon–Fri at 16:30 US Eastern (20:30 UTC)
+
 ## Features
 
 - **Multi-Category ETF Tracking**: Monitor 180+ ETFs across 6 categories:
