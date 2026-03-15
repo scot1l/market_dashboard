@@ -1,5 +1,7 @@
 # Market Dashboard
 
+**Live Site**: https://market-dashboard-4bd66d.gitlab.io
+
 Static stock dashboard with daily auto-refresh via GitLab CI/CD (Yahoo Finance), hosted on GitLab Pages.
 
 ## Features
