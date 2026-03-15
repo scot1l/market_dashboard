@@ -8,13 +8,14 @@ Static stock dashboard with daily auto-refresh via GitLab CI/CD (Yahoo Finance),
 
 ## Features
 
-- **Multi-Category ETF Tracking**: Monitor 180+ ETFs across 6 categories:
+- **Multi-Category ETF Tracking**: Monitor 180+ ETFs across 7 categories:
   - Indices (SPY, QQQ, DIA, etc.)
   - S&P Style ETFs (Value, Growth, etc.)
   - Select Sector ETFs (XLE, XLF, XLK, etc.)
   - Equal-Weight Sector ETFs
   - Industry ETFs
   - Country ETFs (EEM, EFA, etc.)
+  - Leveraged ETFs (TQQQ, SQQQ, DPST, etc.)
 
 - **Advanced Technical Indicators**:
   - **Grade (ABC Rating)**: Trend strength based on EMA10 > EMA20 > SMA50 alignment
