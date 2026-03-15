@@ -4,7 +4,7 @@ stages:
   - deploy
 
 variables:
-  TZ: UTC
+  TZ: America/New_York
 
 build:
   stage: build
@@ -16,12 +16,6 @@ build:
     paths:
       - data/
     expire_in: 1 day
-  only:
-    - schedules
-    - main
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
 
 pages:
   stage: deploy
@@ -33,9 +27,5 @@ pages:
       - data/
       - index.html
     expire_in: 1 day
-  only:
-    - main
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
   dependencies:
     - build
