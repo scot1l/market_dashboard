@@ -1,0 +1,45 @@
+{
+  "symbol": "MGK",
+  "holdings": [
+    {
+      "symbol": "NVDA",
+      "weight": 0.1350356
+    },
+    {
+      "symbol": "AAPL",
+      "weight": 0.11704931
+    },
+    {
+      "symbol": "MSFT",
+      "weight": 0.09596679
+    },
+    {
+      "symbol": "GOOGL",
+      "weight": 0.058432397
+    },
+    {
+      "symbol": "META",
+      "weight": 0.0491474
+    },
+    {
+      "symbol": "AMZN",
+      "weight": 0.0481589
+    },
+    {
+      "symbol": "GOOG",
+      "weight": 0.0462313
+    },
+    {
+      "symbol": "TSLA",
+      "weight": 0.0434126
+    },
+    {
+      "symbol": "AVGO",
+      "weight": 0.0392118
+    },
+    {
+      "symbol": "LLY",
+      "weight": 0.032190498
+    }
+  ]
+}

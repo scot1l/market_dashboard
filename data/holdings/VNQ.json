@@ -1,0 +1,45 @@
+{
+  "symbol": "VNQ",
+  "holdings": [
+    {
+      "symbol": "VRTPX",
+      "weight": 0.1447489
+    },
+    {
+      "symbol": "WELL",
+      "weight": 0.0705308
+    },
+    {
+      "symbol": "PLD",
+      "weight": 0.068600796
+    },
+    {
+      "symbol": "AMT",
+      "weight": 0.047497302
+    },
+    {
+      "symbol": "EQIX",
+      "weight": 0.0454558
+    },
+    {
+      "symbol": "SPG",
+      "weight": 0.0353396
+    },
+    {
+      "symbol": "DLR",
+      "weight": 0.0320226
+    },
+    {
+      "symbol": "O",
+      "weight": 0.0313884
+    },
+    {
+      "symbol": "CBRE",
+      "weight": 0.028675599
+    },
+    {
+      "symbol": "PSA",
+      "weight": 0.024675801
+    }
+  ]
+}

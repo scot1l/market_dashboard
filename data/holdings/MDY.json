@@ -1,0 +1,45 @@
+{
+  "symbol": "MDY",
+  "holdings": [
+    {
+      "symbol": "CIEN",
+      "weight": 0.010648
+    },
+    {
+      "symbol": "COHR",
+      "weight": 0.0099962
+    },
+    {
+      "symbol": "LITE",
+      "weight": 0.008328401
+    },
+    {
+      "symbol": "CW",
+      "weight": 0.0072593
+    },
+    {
+      "symbol": "FLEX",
+      "weight": 0.0069884
+    },
+    {
+      "symbol": "CASY",
+      "weight": 0.0067602005
+    },
+    {
+      "symbol": "FTI",
+      "weight": 0.006757
+    },
+    {
+      "symbol": "ILMN",
+      "weight": 0.0066332
+    },
+    {
+      "symbol": "PSTG",
+      "weight": 0.0065085
+    },
+    {
+      "symbol": "RGLD",
+      "weight": 0.0063954997
+    }
+  ]
+}

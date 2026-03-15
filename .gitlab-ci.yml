@@ -1,0 +1,41 @@
+# Refresh dashboard data daily and commit so GitLab Pages serves updated JSON/charts.
+stages:
+  - build
+  - deploy
+
+variables:
+  TZ: UTC
+
+build:
+  stage: build
+  image: python:3.11-slim
+  script:
+    - pip install -r requirements.txt
+    - python scripts/build_data.py --out-dir data
+  artifacts:
+    paths:
+      - data/
+    expire_in: 1 day
+  only:
+    - schedules
+    - main
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+pages:
+  stage: deploy
+  script:
+    - echo "Deploying to GitLab Pages"
+  artifacts:
+    paths:
+      - public
+      - data/
+      - index.html
+    expire_in: 1 day
+  only:
+    - main
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  dependencies:
+    - build

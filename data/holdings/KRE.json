@@ -1,0 +1,45 @@
+{
+  "symbol": "KRE",
+  "holdings": [
+    {
+      "symbol": "BPOP",
+      "weight": 0.0218938
+    },
+    {
+      "symbol": "WBS",
+      "weight": 0.0218863
+    },
+    {
+      "symbol": "VLY",
+      "weight": 0.0206978
+    },
+    {
+      "symbol": "CFR",
+      "weight": 0.020650301
+    },
+    {
+      "symbol": "MTB",
+      "weight": 0.020586701
+    },
+    {
+      "symbol": "SSB",
+      "weight": 0.020124199
+    },
+    {
+      "symbol": "CFG",
+      "weight": 0.0199925
+    },
+    {
+      "symbol": "WTFC",
+      "weight": 0.0198363
+    },
+    {
+      "symbol": "RF",
+      "weight": 0.0197366
+    },
+    {
+      "symbol": "HWC",
+      "weight": 0.0194482
+    }
+  ]
+}

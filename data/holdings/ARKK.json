@@ -1,0 +1,45 @@
+{
+  "symbol": "ARKK",
+  "holdings": [
+    {
+      "symbol": "TSLA",
+      "weight": 0.1036238
+    },
+    {
+      "symbol": "CRSP",
+      "weight": 0.0695589
+    },
+    {
+      "symbol": "TEM",
+      "weight": 0.0532396
+    },
+    {
+      "symbol": "ROKU",
+      "weight": 0.0468861
+    },
+    {
+      "symbol": "SHOP",
+      "weight": 0.0450208
+    },
+    {
+      "symbol": "COIN",
+      "weight": 0.0409447
+    },
+    {
+      "symbol": "HOOD",
+      "weight": 0.040844698
+    },
+    {
+      "symbol": "BEAM",
+      "weight": 0.0379659
+    },
+    {
+      "symbol": "RBLX",
+      "weight": 0.037756
+    },
+    {
+      "symbol": "AMD",
+      "weight": 0.0373167
+    }
+  ]
+}

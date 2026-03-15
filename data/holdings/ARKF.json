@@ -1,0 +1,41 @@
+{
+  "symbol": "ARKF",
+  "holdings": [
+    {
+      "symbol": "SHOP",
+      "weight": 0.0998665
+    },
+    {
+      "symbol": "COIN",
+      "weight": 0.0582642
+    },
+    {
+      "symbol": "CRCL",
+      "weight": 0.053031903
+    },
+    {
+      "symbol": "HOOD",
+      "weight": 0.044967398
+    },
+    {
+      "symbol": "TOST",
+      "weight": 0.0430155
+    },
+    {
+      "symbol": "XYZ",
+      "weight": 0.042834
+    },
+    {
+      "symbol": "PLTR",
+      "weight": 0.0417871
+    },
+    {
+      "symbol": "RBLX",
+      "weight": 0.035208
+    },
+    {
+      "symbol": "BLSH",
+      "weight": 0.0330915
+    }
+  ]
+}
