@@ -21,7 +21,7 @@ Static stock dashboard with daily auto-refresh via GitLab CI/CD (Yahoo Finance),
   - **Daily/Intra/5D/20D**: Performance metrics with visual bars
 
 - **Interactive Charts**: TradingView integration with:
-  - Multiple chart view (single symbol)
+  - Single chart view (one symbol at a time)
   - Multi-chart grid view (entire sector at once)
   - SPY overlay comparison
   - MA% Ribbon indicator
