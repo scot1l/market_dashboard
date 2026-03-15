@@ -19,13 +19,16 @@ build:
 
 pages:
   stage: deploy
+  image: alpine:latest
   script:
-    - echo "Deploying to GitLab Pages"
+    # GitLab Pages 只发布 public 目录，把站点文件放进 public/
+    - mkdir -p public
+    - cp index.html public/
+    - cp -r data public/
   artifacts:
     paths:
       - public
-      - data/
-      - index.html
-    expire_in: 1 day
   dependencies:
     - build
+  rules:
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
