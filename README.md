@@ -104,4 +104,4 @@ market-dashboard/
 └── README.md
 ```
 
-Data: Yahoo Finance (yfinance), economic calendar (investpy). Charts: TradingView embed.
+Data: Yahoo Finance (yfinance), economic calendar and market breadth (TradingView widgets). Charts: TradingView widget.
