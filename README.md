@@ -1,107 +1,61 @@
-# Market Dashboard
+# China ETF Rotation Dashboard
 
-**Live Site**: https://market-dashboard-4bd66d.gitlab.io
+Static A-share ETF dashboard for after-close regime reading and sector rotation.
 
-Static stock dashboard with daily auto-refresh via GitLab CI/CD (Yahoo Finance), hosted on GitLab Pages.
+The project now tracks a curated set of China-listed ETFs across:
 
-**Data Updates**: Mon–Fri at 16:30 US Eastern (20:30 UTC)
+- Broad market
+- Growth themes
+- Cyclicals
+- Domestic demand
+- Defense
 
-## Features
+The data pipeline builds a static snapshot with:
 
-- **Multi-Category ETF Tracking**: Monitor 180+ ETFs across 7 categories:
-  - Indices (SPY, QQQ, DIA, etc.)
-  - S&P Style ETFs (Value, Growth, etc.)
-  - Select Sector ETFs (XLE, XLF, XLK, etc.)
-  - Equal-Weight Sector ETFs
-  - Industry ETFs
-  - Country ETFs (EEM, EFA, etc.)
-  - Leveraged ETFs (TQQQ, SQQQ, DPST, etc.)
+- `Grade`: EMA10 / EMA20 / SMA50 trend alignment
+- `ATR%`
+- `ATRx50`: distance from the 50-session average in ATR units
+- `RS21`: 21-session volatility-adjusted relative-strength percentile versus a benchmark ETF
+- `Group%`: 20-day return percentile inside the same group
+- `Amt20`: average 20-session turnover in CNY 100m
+- `AmtZ`: latest turnover shock versus the last 20 sessions
 
-- **Advanced Technical Indicators**:
-  - **Grade (ABC Rating)**: Trend strength based on EMA10 > EMA20 > SMA50 alignment
-  - **ATR%**: Daily ATR as percentage of price
-  - **ATRx**: Distance from SMA50 in ATR units
-  - **1M-VARS**: Volatility-Adjusted Relative Strength vs SPY (21-day)
-  - **VARS**: Relative strength visualization chart
-  - **Daily/Intra/5D/20D**: Performance metrics with visual bars
+## Data source
 
-- **Interactive Charts**: TradingView integration with:
-  - Single chart view (one symbol at a time)
-  - Multi-chart grid view (entire sector at once)
-  - SPY overlay comparison
-  - MA% Ribbon indicator
+- `AkShare`
+- ETF history path: `fund_etf_hist_sina`
 
-- **ETF Holdings**: View top 10 holdings for any ETF with weight percentages
+This avoids the U.S.-market assumptions from the original repo and works better from a China-based workflow.
 
-- **Market Data Tools**:
-  - Economic Calendar (TradingView widget)
-  - Market Breadth overview
-
-- **User Experience**:
-  - Keyboard navigation (Arrow keys to browse, H for holdings)
-  - Column sorting (click any header to sort)
-  - Dark theme UI
-  - Auto-refresh daily via GitLab CI/CD
-
-## Build data locally
+## Build locally
 
 ```bash
-cd market-dashboard
 pip install -r requirements.txt
 python scripts/build_data.py --out-dir data
-```
-
-This generates: `data/snapshot.json`, `data/events.json`, `data/meta.json`, and `data/charts/*.png`.
-
-**Local preview (required):** Do not double-click `index.html` - the browser will block loading `data/*.json`. From the `market-dashboard` folder run a local server, then open the URL:
-
-```bash
-cd market-dashboard
 python -m http.server 8000
 ```
 
-Then in your browser open: **http://localhost:8000**
+Then open:
 
-## Publish to GitLab (first time)
+- `http://localhost:8000`
 
-1. On [GitLab](https://gitlab.com/new), create a **new repository** (e.g. `market-dashboard`). Do **not** add a README or .gitignore.
-2. In a terminal, from the `market-dashboard` folder run (replace `YOUR_USERNAME` and repo name if different):
+## Generated files
 
-```bash
-git remote add origin git@gitlab.com:YOUR_USERNAME/market-dashboard.git
-git branch -M main
-git push -u origin main
-```
+The builder writes:
 
-3. Then follow **Deploy to GitLab Pages** below.
+- `data/snapshot.json`
+- `data/meta.json`
+- `data/breadth.json`
+- `data/charts/*.png`
 
-## Deploy to GitLab Pages
+## Recommended usage
 
-1. Create a new GitLab repository and push this directory's contents to it (or push as the repo root).
-2. **Before first deploy** you need initial data. Either:
-   - **Recommended:** In the repo go to **CI/CD > Pipelines** > Run Pipeline. When it finishes, it will commit `data/` to the repo.
-   - Or run locally: `python scripts/build_data.py --out-dir data`, then `git add data/`, commit and push.
-3. In the repo **Settings > Pages**:
-   - The site will be automatically deployed from the `main` branch.
-   - Enable GitLab Pages in Settings if not already enabled.
-4. The pipeline runs daily at 20:30 UTC (Mon-Fri) to refresh data; you can also run it manually from **CI/CD > Pipelines**.
+- Run the build after the A-share cash close.
+- Start with the breadth cards and the `Broad` group to determine regime.
+- Then sort each group by `RS21`, `Group%`, or `AmtZ` to find leadership and expanding participation.
+- Use the chart panel to confirm whether a theme is trending cleanly or already too extended.
 
-Site URL: `https://<your-username>.gitlab.io/<repo-name>/`
+## Notes
 
-## Project structure
-
-```
-market-dashboard/
-├── .gitlab-ci.yml                    # Daily data refresh (GitLab CI/CD)
-├── scripts/build_data.py             # Fetches data, outputs JSON + charts
-├── data/                             # Generated (commit for Pages)
-│   ├── snapshot.json
-│   ├── events.json
-│   ├── meta.json
-│   └── charts/*.png
-├── index.html                        # Static frontend
-├── requirements.txt
-└── README.md
-```
-
-Data: Yahoo Finance (yfinance), economic calendar and market breadth (TradingView widgets). Charts: TradingView widget.
+- This is an ETF rotation dashboard, not a stock-selection terminal.
+- It is designed for discretionary next-day focus lists, not automated trade execution.

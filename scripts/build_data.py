@@ -1,469 +1,344 @@
-"""
-Build dashboard data for static GitHub Pages deployment.
-Run from repo root: python scripts/build_data.py [--out-dir data]
-Outputs: data/snapshot.json, data/events.json, data/meta.json, data/charts/*.png
-"""
-from __future__ import print_function
+from __future__ import annotations
+
 import argparse
 import json
-import os
-import re
-import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, List
 
-import yfinance as yf
-import pandas as pd
-import numpy as np
+import akshare as ak
 import matplotlib
-matplotlib.use('Agg')
+import pandas as pd
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta, timezone
-from io import BytesIO
-from scipy.stats import rankdata
-
-# --- Config: no Liquid Stocks ---
-KEY_EVENTS = [
-    "Fed", "Federal Reserve", "Interest Rate", "FOMC",
-    "ISM Manufacturing", "ISM Non-Manufacturing", "ISM Services", "ISM",
-    "CPI", "Consumer Price Index", "Nonfarm Payrolls", "NFP", "Employment",
-    "PPI", "Producer Price Index", "PCE", "Core PCE", "Personal Consumption",
-    "Retail Sales", "GDP", "Gross Domestic Product", "Unemployment", "Jobless Claims", "Initial Claims",
-    "Housing Starts", "Building Permits", "Durable Goods", "Factory Orders",
-    "Consumer Confidence", "Michigan Consumer", "Trade Balance", "Trade Deficit",
-    "Beige Book", "Fed Minutes", "JOLTS", "Job Openings"
-]
-
-STOCK_GROUPS = {
-    "Indices": ["QQQE", "MGK", "QQQ", "IBIT", "RSP", "MDY", "IWM", "TLT", "SPY", "ETHA", "DIA"],
-    "S&P Style ETFs": ["IJS", "IJR", "IJT", "IJJ", "IJH", "IJK", "IVE", "IVV", "IVW"],
-    "Sel Sectors": ["XLK", "XLI", "XLC", "XLF", "XLU", "XLY", "XLRE", "XLP", "XLB", "XLE", "XLV"],
-    "EW Sectors": ["RSPT", "RSPC", "RSPN", "RSPF", "RSP", "RSPD", "RSPU", "RSPR", "RSPH", "RSPM", "RSPS", "RSPG"],
-    "Industries": [
-        "TAN", "KCE", "IBUY", "QQQE", "JETS", "IBB", "SMH", "CIBR", "UTES", "ROBO", "IGV", "WCLD", "ITA", "PAVE", "BLOK", "AIQ", "IYZ", "PEJ", "FDN", "KBE",
-        "UNG", "BOAT", "KWEB", "KRE", "IBIT", "XRT", "IHI", "DRIV", "MSOS", "SOCL", "XLU", "ARKF", "SLX", "ARKK", "XTN", "XME", "KIE", "GLD", "GXC", "SCHH",
-        "GDX", "IPAY", "IWM", "XOP", "VNQ", "EATZ", "FXI", "DBA", "ICLN", "SILJ", "REZ", "LIT", "SLV", "XHB", "XHE", "PBJ", "USO", "DBC", "FCG", "XBI",
-        "ARKG", "CPER", "XES", "OIH", "PPH", "FNGS", "URA", "WGMI", "REMX"
-    ],
-    "Countries": [
-        "EZA", "ARGT", "EWA", "THD", "EIDO", "EWC", "GREK", "EWP", "EWG", "EWL", "EUFN", "EWY", "IEUR", "EFA", "ACWI",
-        "IEV", "EWQ", "EWI", "EWJ", "EWW", "ECH", "EWD", "ASHR", "EWS", "KSA", "INDA", "EEM", "EWZ", "TUR", "EWH", "EWT", "MCHI"
-    ]
-}
-
-LEVERAGED_ETFS = {
-    "QQQ": {"long": ["TQQQ"], "short": ["SQQQ"]},
-    "MDY": {"long": ["MIDU"], "short": []},
-    "IWM": {"long": ["TNA"], "short": ["TZA"]},
-    "TLT": {"long": ["TMF"], "short": ["TMV"]},
-    "SPY": {"long": ["SPXL", "UPRO"], "short": ["SPXS", "SH"]},
-    "ETHA": {"long": ["ETHU"], "short": []},
-    "XLK": {"long": ["TECL"], "short": ["TECS"]},
-    "XLI": {"long": ["DUSL"], "short": []},
-    "XLC": {"long": ["LTL"], "short": []},
-    "XLF": {"long": ["FAS"], "short": ["FAZ"]},
-    "XLU": {"long": ["UTSL"], "short": []},
-    "XLY": {"long": ["WANT"], "short": ["SCC"]},
-    "XLRE": {"long": ["DRN"], "short": ["DRV"]},
-    "XLP": {"long": ["UGE"], "short": ["SZK"]},
-    "XLB": {"long": ["UYM"], "short": ["SMN"]},
-    "XLE": {"long": ["ERX"], "short": ["ERY"]},
-    "XLV": {"long": ["CURE"], "short": []},
-    "SMH": {"long": ["SOXL"], "short": ["SOXS"]},
-    "ARKK": {"long": ["TARK"], "short": ["SARK"]},
-    "XTN": {"long": ["TPOR"], "short": []},
-    "KWEB": {"long": ["CWEB"], "short": []},
-    "XRT": {"long": ["RETL"], "short": []},
-    "KRE": {"long": ["DPST"], "short": []},
-    "DRIV": {"long": ["EVAV"], "short": []},
-    "XBI": {"long": ["LABU"], "short": ["LABD"]},
-    "ROBO": {"long": ["UBOT"], "short": []},
-    "XHB": {"long": ["NAIL"], "short": []},
-    "FNGS": {"long": ["FNGB"], "short": ["FNGD"]},
-    "WCLD": {"long": ["CLDL"], "short": []},
-    "XOP": {"long": ["GUSH"], "short": ["DRIP"]},
-    "FDN": {"long": ["WEBL"], "short": ["WEBS"]},
-    "FXI": {"long": ["YINN"], "short": ["YANG"]},
-    "PEJ": {"long": ["OOTO"], "short": []},
-    "USO": {"long": ["UCO"], "short": ["SCO"]},
-    "PPH": {"long": ["PILL"], "short": []},
-    "ITA": {"long": ["DFEN"], "short": []},
-    "SLV": {"long": ["AGQ"], "short": ["ZSL"]},
-    "GLD": {"long": ["UGL"], "short": ["GLL"]},
-    "UNG": {"long": ["BOIL"], "short": ["KOLD"]},
-    "GDX": {"long": ["NUGT", "GDXU"], "short": ["JDST", "GDXD"]},
-    "IBIT": {"long": ["BITX", "BITU"], "short": ["SBIT", "BITI"]},
-    "MSOS": {"long": ["MSOX"], "short": []},
-    "REMX": {"long": [], "short": []},
-    "EWY": {"long": ["KORU"], "short": []},
-    "IEV": {"long": ["EURL"], "short": []},
-    "EWJ": {"long": ["EZJ"], "short": []},
-    "EWW": {"long": ["MEXX"], "short": []},
-    "ASHR": {"long": ["CHAU"], "short": []},
-    "INDA": {"long": ["INDL"], "short": []},
-    "EEM": {"long": ["EDC"], "short": ["EDZ"]},
-    "EWZ": {"long": ["BRZU"], "short": []}
-}
-
-SECTOR_COLORS = {
-    "Information Technology": "#3f51b5", "Industrials": "#333", "Emerging Markets": "#00bcd4",
-    "Consumer Discretionary": "#4caf50", "Health Care": "#e91e63", "Financials": "#ff5722",
-    "Energy": "#795548", "Communication Services": "#9c27b0", "Real Estate": "#673ab7",
-    "Commodities": "#8b6914", "Materials": "#ff9800", "Utilities": "#009688",
-    "Consumer Staples": "#8bc34a", "Broad Market": "#9e9e9e",
-}
-
-Industries_COLORS = {
-    "SMH": "#3f51b5", "ARKK": "#3f51b5", "XTN": "#333", "KWEB": "#00bcd4", "XRT": "#4caf50", "KRE": "#ff5722",
-    "ARKF": "#3f51b5", "ARKG": "#e91e63", "BOAT": "#333", "DRIV": "#4caf50", "KBE": "#ff5722", "XES": "#795548",
-    "XBI": "#e91e63", "OIH": "#795548", "SOCL": "#9c27b0", "ROBO": "#333", "AIQ": "#3f51b5", "XHB": "#4caf50",
-    "FNGS": "#9e9e9e", "BLOK": "#3f51b5", "LIT": "#ff9800", "WCLD": "#3f51b5", "XOP": "#795548", "FDN": "#4caf50",
-    "TAN": "#795548", "IBB": "#e91e63", "PAVE": "#333", "PEJ": "#4caf50", "KCE": "#ff5722", "XHE": "#e91e63",
-    "IBUY": "#4caf50", "MSOS": "#4caf50", "FCG": "#795548", "JETS": "#4caf50", "IPAY": "#ff5722", "SLX": "#ff9800",
-    "IGV": "#3f51b5", "CIBR": "#3f51b5", "EATZ": "#4caf50", "PPH": "#e91e63", "IHI": "#e91e63", "UTES": "#009688",
-    "ICLN": "#795548", "XME": "#ff9800", "IYZ": "#9c27b0", "URA": "#795548", "ITA": "#333", "VNQ": "#673ab7",
-    "SCHH": "#673ab7", "KIE": "#ff5722", "REZ": "#673ab7", "CPER": "#8b6914", "PBJ": "#8bc34a", "SLV": "#8b6914",
-    "GLD": "#8b6914", "SILJ": "#ff9800", "GDX": "#ff9800", "FXI": "#00bcd4", "GXC": "#00bcd4", "USO": "#8b6914",
-    "DBA": "#8b6914", "UNG": "#8b6914", "DBC": "#8b6914", "WGMI": "#3f51b5", "REMX": "#ff9800",
-}
 
 
-def get_ticker_to_sector_mapping():
-    color_to_sector = {c: s for s, c in SECTOR_COLORS.items()}
-    return {t: color_to_sector.get(c, "Broad Market") for t, c in Industries_COLORS.items()}
+ROOT = Path(__file__).resolve().parents[1]
+CONFIG_PATH = ROOT / "config" / "china_etf_universe.json"
 
 
-TICKER_TO_SECTOR = get_ticker_to_sector_mapping()
+def load_universe() -> Dict[str, object]:
+    with CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
 
 
-def get_leveraged_etfs(ticker):
-    if ticker in LEVERAGED_ETFS:
-        return LEVERAGED_ETFS[ticker].get("long", []), LEVERAGED_ETFS[ticker].get("short", [])
-    return [], []
+def provider_symbol(exchange: str, code: str) -> str:
+    if exchange == "SSE":
+        return f"sh{code}"
+    if exchange == "SZSE":
+        return f"sz{code}"
+    raise ValueError(f"Unsupported exchange: {exchange}")
 
 
-
-def calculate_atr(hist_data, period=14):
-    try:
-        hl = hist_data['High'] - hist_data['Low']
-        hc = (hist_data['High'] - hist_data['Close'].shift()).abs()
-        lc = (hist_data['Low'] - hist_data['Close'].shift()).abs()
-        tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
-        return tr.ewm(alpha=1/period, adjust=False).mean().iloc[-1]
-    except Exception:
-        return None
+def tradingview_symbol(exchange: str, code: str) -> str:
+    return f"{exchange}:{code}"
 
 
-def calculate_rrs(stock_data, spy_data, atr_length=14, length_rolling=50, length_sma=20, atr_multiplier=1.0):
-    try:
-        merged = pd.merge(
-            stock_data[['High', 'Low', 'Close']], spy_data[['High', 'Low', 'Close']],
-            left_index=True, right_index=True, suffixes=('_stock', '_spy'), how='inner'
+def fetch_history(exchange: str, code: str, cache: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    cache_key = f"{exchange}:{code}"
+    if cache_key in cache:
+        return cache[cache_key].copy()
+
+    history = ak.fund_etf_hist_sina(symbol=provider_symbol(exchange, code))
+    if history.empty:
+        raise ValueError(f"No history returned for {exchange}:{code}")
+
+    normalized = history.copy()
+    normalized["date"] = pd.to_datetime(normalized["date"])
+    for column in ["open", "high", "low", "close", "volume", "amount"]:
+        normalized[column] = pd.to_numeric(normalized[column], errors="coerce")
+    normalized = normalized.dropna(subset=["date", "open", "high", "low", "close", "volume", "amount"])
+    normalized = normalized.sort_values("date").drop_duplicates(subset="date").tail(260).reset_index(drop=True)
+    if len(normalized) < 60:
+        raise ValueError(f"Insufficient history for {exchange}:{code}")
+
+    cache[cache_key] = normalized
+    return normalized.copy()
+
+
+def calculate_atr(history: pd.DataFrame, period: int = 14) -> float:
+    true_range = pd.concat(
+        [
+            history["high"] - history["low"],
+            (history["high"] - history["close"].shift(1)).abs(),
+            (history["low"] - history["close"].shift(1)).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+    return float(true_range.ewm(alpha=1 / period, adjust=False).mean().iloc[-1])
+
+
+def calculate_grade(history: pd.DataFrame) -> str:
+    ema10 = history["close"].ewm(span=10, adjust=False).mean().iloc[-1]
+    ema20 = history["close"].ewm(span=20, adjust=False).mean().iloc[-1]
+    sma50 = history["close"].rolling(window=50).mean().iloc[-1]
+    if ema10 > ema20 and ema20 > sma50:
+        return "A"
+    if ema10 < ema20 and ema20 < sma50:
+        return "C"
+    return "B"
+
+
+def calculate_relative_strength(asset_history: pd.DataFrame, benchmark_history: pd.DataFrame) -> pd.DataFrame:
+    merged = asset_history[["date", "high", "low", "close"]].merge(
+        benchmark_history[["date", "high", "low", "close"]],
+        on="date",
+        suffixes=("_asset", "_bench"),
+        how="inner",
+    )
+    if len(merged) < 30:
+        raise ValueError("Not enough overlapping sessions for relative-strength calculation")
+
+    for suffix in ["asset", "bench"]:
+        true_range = pd.concat(
+            [
+                merged[f"high_{suffix}"] - merged[f"low_{suffix}"],
+                (merged[f"high_{suffix}"] - merged[f"close_{suffix}"].shift(1)).abs(),
+                (merged[f"low_{suffix}"] - merged[f"close_{suffix}"].shift(1)).abs(),
+            ],
+            axis=1,
+        ).max(axis=1)
+        merged[f"atr_{suffix}"] = true_range.ewm(alpha=1 / 14, adjust=False).mean()
+
+    asset_change = merged["close_asset"] - merged["close_asset"].shift(1)
+    benchmark_change = merged["close_bench"] - merged["close_bench"].shift(1)
+    benchmark_pressure = benchmark_change / merged["atr_bench"]
+    expected_move = benchmark_pressure * merged["atr_asset"]
+
+    merged["rrs"] = (asset_change - expected_move) / merged["atr_asset"]
+    merged["rolling_rrs"] = merged["rrs"].rolling(window=50, min_periods=5).mean()
+    merged["signal"] = merged["rolling_rrs"].rolling(window=20, min_periods=3).mean()
+    return merged[["date", "rrs", "rolling_rrs", "signal"]].dropna(subset=["rolling_rrs"]).reset_index(drop=True)
+
+
+def percentile_of_last(series: pd.Series) -> float:
+    recent = series.dropna().tail(21)
+    if recent.empty or len(recent) == 1:
+        return 50.0
+    ranks = recent.rank(method="average")
+    return float(((ranks.iloc[-1] - 1) / (len(recent) - 1)) * 100)
+
+
+def zscore_of_last(series: pd.Series) -> float:
+    recent = series.dropna().tail(20)
+    if recent.empty:
+        return 0.0
+    std = float(recent.std(ddof=0))
+    if std == 0:
+        return 0.0
+    return float((recent.iloc[-1] - recent.mean()) / std)
+
+
+def create_rs_chart(rs_frame: pd.DataFrame, code: str, charts_dir: Path) -> str:
+    recent = rs_frame.tail(20)
+    if recent.empty:
+        raise ValueError(f"Relative-strength chart is empty for {code}")
+
+    fig, axis = plt.subplots(figsize=(4.2, 1.2))
+    fig.patch.set_facecolor("#08111f")
+    axis.set_facecolor("#08111f")
+
+    bars = recent["rolling_rrs"]
+    signal = recent["signal"]
+    strongest_index = int(bars.argmax())
+    colors = ["#38bdf8" if idx == strongest_index else "#475569" for idx in range(len(bars))]
+
+    axis.bar(range(len(bars)), bars, color=colors, width=0.82)
+    axis.plot(range(len(signal)), signal, color="#f59e0b", linewidth=1.8)
+    axis.axhline(y=0, color="#64748b", linestyle="--", linewidth=0.9)
+    axis.set_xticks([])
+    axis.set_yticks([])
+    for spine in axis.spines.values():
+        spine.set_visible(False)
+
+    fig.tight_layout(pad=0.1)
+    output_path = charts_dir / f"{code}.png"
+    fig.savefig(output_path, dpi=110, bbox_inches="tight", facecolor="#08111f")
+    plt.close(fig)
+    return f"data/charts/{code}.png"
+
+
+def build_row(
+    item: Dict[str, str],
+    benchmark_name: str,
+    history_cache: Dict[str, pd.DataFrame],
+    charts_dir: Path,
+) -> Dict[str, object]:
+    history = fetch_history(item["exchange"], item["code"], history_cache)
+    benchmark_history = fetch_history(item["benchmark_exchange"], item["benchmark_code"], history_cache)
+
+    close = history["close"]
+    amount = history["amount"]
+    ema20 = history["close"].ewm(span=20, adjust=False).mean().iloc[-1]
+    sma50 = history["close"].rolling(window=50).mean().iloc[-1]
+    atr = calculate_atr(history)
+    rs_frame = calculate_relative_strength(history, benchmark_history)
+
+    return {
+        "code": item["code"],
+        "label": item["label"],
+        "name": item["name"],
+        "group": item["group"],
+        "exchange": item["exchange"],
+        "chart_symbol": tradingview_symbol(item["exchange"], item["code"]),
+        "benchmark_code": item["benchmark_code"],
+        "benchmark_name": benchmark_name,
+        "benchmark_chart_symbol": tradingview_symbol(item["benchmark_exchange"], item["benchmark_code"]),
+        "market_date": history.iloc[-1]["date"].date().isoformat(),
+        "daily": round((close.iloc[-1] / close.iloc[-2] - 1) * 100, 2),
+        "5d": round((close.iloc[-1] / close.iloc[-6] - 1) * 100, 2),
+        "20d": round((close.iloc[-1] / close.iloc[-21] - 1) * 100, 2),
+        "atr_pct": round((atr / close.iloc[-1]) * 100, 2),
+        "atrx50": round((close.iloc[-1] - sma50) / atr, 2),
+        "rs_21d": round(percentile_of_last(rs_frame["rolling_rrs"]), 0),
+        "amount_20d_avg": round(amount.tail(20).mean() / 100000000, 1),
+        "amount_z_20d": round(zscore_of_last(amount), 2),
+        "grade": calculate_grade(history),
+        "above_ema20": bool(close.iloc[-1] > ema20),
+        "above_sma50": bool(close.iloc[-1] > sma50),
+        "rs_chart": create_rs_chart(rs_frame, item["code"], charts_dir),
+    }
+
+
+def assign_group_ranks(rows: List[Dict[str, object]]) -> None:
+    if not rows:
+        return
+    if len(rows) == 1:
+        rows[0]["group_rank_20d"] = 50.0
+        return
+
+    values = pd.Series([row["20d"] for row in rows], index=range(len(rows)))
+    ranks = values.rank(method="average")
+    for index, row in enumerate(rows):
+        row["group_rank_20d"] = round(((ranks.iloc[index] - 1) / (len(rows) - 1)) * 100, 0)
+
+
+def build_breadth(groups: Dict[str, List[Dict[str, object]]], group_order: List[str], built_at: str) -> Dict[str, object]:
+    summaries = []
+    all_rows = [row for rows in groups.values() for row in rows]
+
+    for group_name in group_order:
+        rows = groups[group_name]
+        if not rows:
+            continue
+        strongest = sorted(rows, key=lambda row: row["rs_21d"], reverse=True)
+        weakest = sorted(rows, key=lambda row: row["rs_21d"])
+        summaries.append(
+            {
+                "group": group_name,
+                "count": len(rows),
+                "avg_daily": round(sum(row["daily"] for row in rows) / len(rows), 2),
+                "avg_5d": round(sum(row["5d"] for row in rows) / len(rows), 2),
+                "avg_20d": round(sum(row["20d"] for row in rows) / len(rows), 2),
+                "avg_rs_21d": round(sum(row["rs_21d"] for row in rows) / len(rows), 0),
+                "above_ema20": sum(1 for row in rows if row["above_ema20"]),
+                "above_sma50": sum(1 for row in rows if row["above_sma50"]),
+                "leaders": [{"code": row["code"], "label": row["label"], "rs_21d": row["rs_21d"]} for row in strongest[:3]],
+                "laggards": [{"code": row["code"], "label": row["label"], "rs_21d": row["rs_21d"]} for row in weakest[:3]],
+            }
         )
-        if len(merged) < atr_length + 1:
-            return None
-        for prefix in ['stock', 'spy']:
-            h, l, c = merged[f'High_{prefix}'], merged[f'Low_{prefix}'], merged[f'Close_{prefix}']
-            tr = pd.concat([h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1).max(axis=1)
-            merged[f'atr_{prefix}'] = tr.ewm(alpha=1/atr_length, adjust=False).mean()
-        sc = merged['Close_stock'] - merged['Close_stock'].shift(1)
-        spy_c = merged['Close_spy'] - merged['Close_spy'].shift(1)
-        spy_pi = spy_c / merged['atr_spy']
-        expected = spy_pi * merged['atr_stock'] * atr_multiplier
-        rrs = (sc - expected) / merged['atr_stock']
-        rolling_rrs = rrs.rolling(window=length_rolling, min_periods=1).mean()
-        rrs_sma = rolling_rrs.rolling(window=length_sma, min_periods=1).mean()
-        return pd.DataFrame({'RRS': rrs, 'rollingRRS': rolling_rrs, 'RRS_SMA': rrs_sma}, index=merged.index)
-    except Exception:
-        return None
+
+    broad_rows = groups.get("Broad", [])
+    broad_average = sum(row["5d"] for row in broad_rows) / len(broad_rows)
+    broad_participation = sum(1 for row in broad_rows if row["above_sma50"]) / len(broad_rows)
+    if broad_average > 0 and broad_participation >= 0.5:
+        market_tone = "Risk-on"
+    elif broad_average < 0 and broad_participation < 0.5:
+        market_tone = "Risk-off"
+    else:
+        market_tone = "Mixed"
+
+    strongest_group = max(summaries, key=lambda summary: summary["avg_rs_21d"])
+    weakest_group = min(summaries, key=lambda summary: summary["avg_rs_21d"])
+
+    return {
+        "built_at": built_at,
+        "groups": summaries,
+        "overview": {
+            "market_tone": market_tone,
+            "strongest_group": strongest_group["group"],
+            "weakest_group": weakest_group["group"],
+            "above_ema20_pct": round(sum(1 for row in all_rows if row["above_ema20"]) / len(all_rows) * 100, 0),
+            "above_sma50_pct": round(sum(1 for row in all_rows if row["above_sma50"]) / len(all_rows) * 100, 0),
+        },
+    }
 
 
-def calculate_sma(hist_data, period=50):
-    try:
-        return hist_data['Close'].rolling(window=period).mean().iloc[-1]
-    except Exception:
-        return None
-
-
-def calculate_ema(hist_data, period=10):
-    try:
-        return hist_data['Close'].ewm(span=period, adjust=False).mean().iloc[-1]
-    except Exception:
-        return None
-
-
-def calculate_abc_rating(hist_data):
-    try:
-        ema10 = calculate_ema(hist_data, 10)
-        ema20 = calculate_ema(hist_data, 20)
-        sma50 = calculate_sma(hist_data, 50)
-        if ema10 is None or ema20 is None or sma50 is None:
-            return None
-        if ema10 > ema20 and ema20 > sma50:
-            return "A"
-        if (ema10 > ema20 and ema20 < sma50) or (ema10 < ema20 and ema20 > sma50):
-            return "B"
-        if ema10 < ema20 and ema20 < sma50:
-            return "C"
-    except Exception:
-        pass
-    return None
-
-
-def create_rs_chart_png(rrs_data, ticker, charts_dir):
-    try:
-        recent = rrs_data.tail(20)
-        if len(recent) == 0:
-            return None
-        plt.style.use('dark_background')
-        fig, ax = plt.subplots(figsize=(8, 2))
-        fig.patch.set_facecolor('#1a1a1a')
-        ax.set_facecolor('#1a1a1a')
-        rolling_rrs = recent['rollingRRS'].values
-        rrs_sma = recent['RRS_SMA'].values
-        max_idx = rolling_rrs.argmax()
-        bar_colors = ['#4ade80' if i == max_idx else '#b0b0b0' for i in range(len(rolling_rrs))]
-        ax.bar(range(len(rolling_rrs)), rolling_rrs, color=bar_colors, width=0.8, edgecolor='none')
-        ax.plot(range(len(rrs_sma)), rrs_sma, color='yellow', lw=2)
-        ax.axhline(y=0, color='#808080', linestyle='--', linewidth=1)
-        mn = min(rolling_rrs.min(), rrs_sma.min() if len(rrs_sma) else 0)
-        mx = max(rolling_rrs.max(), rrs_sma.max() if len(rrs_sma) else 0)
-        pad = 0.1 if mn == mx else (mx - mn) * 0.2
-        ax.set_ylim(mn - pad, mx + pad)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        for s in ax.spines.values():
-            s.set_visible(False)
-        fig.tight_layout(pad=0)
-        safe = re.sub(r'[^a-zA-Z0-9]', '_', ticker)
-        path = os.path.join(charts_dir, f"{safe}.png")
-        fig.savefig(path, format='png', dpi=80, bbox_inches='tight', facecolor='#1a1a1a')
-        plt.close(fig)
-        return f"data/charts/{safe}.png"
-    except Exception as e:
-        print("Chart error", ticker, e)
-        return None
-
-
-def get_stock_data(ticker_symbol, charts_dir):
-    try:
-        stock = yf.Ticker(ticker_symbol)
-        hist = stock.history(period="21d")
-        daily = stock.history(period="60d")
-        if len(hist) < 2 or len(daily) < 50:
-            return None
-
-        daily_change = (hist['Close'].iloc[-1] / hist['Close'].iloc[-2] - 1) * 100
-        intraday_change = (hist['Close'].iloc[-1] / hist['Open'].iloc[-1] - 1) * 100
-        five_day_change = (hist['Close'].iloc[-1] / hist['Close'].iloc[-6] - 1) * 100 if len(hist) >= 6 else None
-        twenty_day_change = (hist['Close'].iloc[-1] / hist['Close'].iloc[-21] - 1) * 100 if len(hist) >= 21 else None
-
-        sma50 = calculate_sma(daily)
-        atr = calculate_atr(daily)
-        current_close = daily['Close'].iloc[-1]
-        atr_pct = (atr / current_close) * 100 if atr and current_close else None
-        dist_sma50_atr = (100 * (current_close / sma50 - 1) / atr_pct) if (sma50 and atr_pct and atr_pct != 0) else None
-        abc_rating = calculate_abc_rating(daily)
-
-        rs_sts = None
-        rrs_data = None
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=120)
-        try:
-            stock_history = stock.history(start=start_date, end=end_date)
-            spy_history = yf.Ticker("SPY").history(start=start_date, end=end_date)
-            if stock_history is not None and spy_history is not None:
-                rrs_data = calculate_rrs(stock_history, spy_history, atr_length=14, length_rolling=50, length_sma=20, atr_multiplier=1.0)
-                if rrs_data is not None and len(rrs_data) >= 21:
-                    recent_21 = rrs_data['rollingRRS'].iloc[-21:]
-                    ranks = rankdata(recent_21, method='average')
-                    rs_sts = ((ranks[-1] - 1) / (len(recent_21) - 1)) * 100
-        except Exception as e:
-            print("RRS error", ticker_symbol, e)
-
-        rs_chart_path = create_rs_chart_png(rrs_data, ticker_symbol, charts_dir) if rrs_data is not None and len(rrs_data) > 0 else None
-        long_etfs, short_etfs = get_leveraged_etfs(ticker_symbol)
-
-        return {
-            "ticker": ticker_symbol,
-            "daily": round(daily_change, 2) if daily_change is not None else None,
-            "intra": round(intraday_change, 2) if intraday_change is not None else None,
-            "5d": round(five_day_change, 2) if five_day_change is not None else None,
-            "20d": round(twenty_day_change, 2) if twenty_day_change is not None else None,
-            "atr_pct": round(atr_pct, 1) if atr_pct is not None else None,
-            "dist_sma50_atr": round(dist_sma50_atr, 2) if dist_sma50_atr is not None else None,
-            "rs": round(rs_sts, 0) if rs_sts is not None else None,
-            "rs_chart": rs_chart_path,
-            "long": long_etfs,
-            "short": short_etfs,
-            "abc": abc_rating
+def build_column_ranges(groups: Dict[str, List[Dict[str, object]]]) -> Dict[str, Dict[str, List[float]]]:
+    ranges = {}
+    for group_name, rows in groups.items():
+        daily_values = [row["daily"] for row in rows]
+        five_day_values = [row["5d"] for row in rows]
+        twenty_day_values = [row["20d"] for row in rows]
+        ranges[group_name] = {
+            "daily": [min(daily_values), max(daily_values)],
+            "5d": [min(five_day_values), max(five_day_values)],
+            "20d": [min(twenty_day_values), max(twenty_day_values)],
         }
-    except Exception as e:
-        print("Error", ticker_symbol, e)
-        return None
+    return ranges
 
 
-# --- ETF Holdings Fetcher ---
-def get_all_etfs():
-    """Collect all ETFs from STOCK_GROUPS."""
-    etfs = set()
-    for group, tickers in STOCK_GROUPS.items():
-        etfs.update(tickers)
-    return sorted(etfs)
+def write_json(path: Path, payload: Dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
 
 
-def fetch_etf_holdings(etf_list, out_dir):
-    """
-    Fetch top 10 holdings for each ETF using yfinance.
-    Saves to data/holdings/{ETF}.json
-    """
-    holdings_dir = os.path.join(out_dir, "holdings")
-    os.makedirs(holdings_dir, exist_ok=True)
-
-    print(f"\nFetching ETF holdings for {len(etf_list)} ETFs...")
-
-    for i, etf_symbol in enumerate(etf_list):
-        try:
-            ticker = yf.Ticker(etf_symbol)
-            holdings_data = ticker.funds_data.top_holdings
-
-            # Handle pandas DataFrame - check if it's empty properly
-            has_holdings = False
-            try:
-                if holdings_data is not None and len(holdings_data) > 0:
-                    has_holdings = True
-            except:
-                has_holdings = False
-
-            if has_holdings:
-                holdings = []
-                for idx, item in holdings_data.head(10).iterrows():
-                    # Handle different column names from yfinance
-                    # Symbol can be in the index or in a "Symbol" column
-                    holding_symbol = str(idx) if idx else ""
-                    if not holding_symbol or holding_symbol == "nan":
-                        holding_symbol = str(item.get("Symbol", item.get("name", "")))
-                    weight = item.get("Holding Percent", item.get("weight"))
-                    if weight is not None:
-                        try:
-                            weight = float(weight)
-                        except (ValueError, TypeError):
-                            weight = None
-                    holdings.append({
-                        "symbol": holding_symbol,
-                        "weight": weight
-                    })
-
-                output_path = os.path.join(holdings_dir, f"{etf_symbol}.json")
-                with open(output_path, "w", encoding="utf-8") as f:
-                    json.dump({"symbol": etf_symbol, "holdings": holdings}, f, ensure_ascii=False, indent=2)
-                print(f"  [{i+1}/{len(etf_list)}] {etf_symbol}: {len(holdings)} holdings saved")
-            else:
-                # Try to get holdings from info
-                info = ticker.info
-                if info and 'topHoldings' in info:
-                    top_holdings = info.get('topHoldings', [])
-                    if top_holdings and len(top_holdings) > 0:
-                        holdings = []
-                        for h in top_holdings[:10]:
-                            holdings.append({
-                                "symbol": h.get("symbol", ""),
-                                "weight": h.get("weight", None)
-                            })
-                        output_path = os.path.join(holdings_dir, f"{etf_symbol}.json")
-                        with open(output_path, "w", encoding="utf-8") as f:
-                            json.dump({"symbol": etf_symbol, "holdings": holdings}, f, ensure_ascii=False, indent=2)
-                        print(f"  [{i+1}/{len(etf_list)}] {etf_symbol}: {len(holdings)} holdings saved (from info)")
-                    else:
-                        print(f"  [{i+1}/{len(etf_list)}] {etf_symbol}: No holdings data")
-                else:
-                    print(f"  [{i+1}/{len(etf_list)}] {etf_symbol}: No holdings data")
-
-            time.sleep(0.3)
-
-        except Exception as e:
-            print(f"  [{i+1}/{len(etf_list)}] {etf_symbol}: Error - {str(e)}")
-
-    print(f"\nETF holdings saved to {holdings_dir}/")
-
-
-def main_holdings():
-    """Standalone main for fetching ETF holdings."""
-    parser = argparse.ArgumentParser(description="Fetch ETF holdings data")
-    parser.add_argument("--out-dir", default="data", help="Output directory")
-    parser.add_argument("--holdings", action="store_true", help="Fetch ETF holdings")
-    args = parser.parse_args()
-
-    etfs = get_all_etfs()
-    fetch_etf_holdings(etfs, args.out_dir)
-
-
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out-dir", default="data", help="Output directory (default: data)")
+    parser.add_argument("--out-dir", default="data", help="Output directory")
     args = parser.parse_args()
-    out_dir = args.out_dir
-    charts_dir = os.path.join(out_dir, "charts")
-    os.makedirs(charts_dir, exist_ok=True)
 
-    print("Fetching stock data (no Liquid Stocks)...")
-    groups_data = {}
-    all_ticker_data = {}
-    for group_name, tickers in STOCK_GROUPS.items():
-        rows = []
-        for i, ticker in enumerate(tickers):
-            print(f"  [{group_name}] {i+1}/{len(tickers)} {ticker}")
-            row = get_stock_data(ticker, charts_dir)
-            if row:
-                rows.append(row)
-                all_ticker_data[ticker] = row
-            time.sleep(0.15)
-        groups_data[group_name] = rows
+    universe = load_universe()
+    items = universe["items"]
+    items_by_code = {item["code"]: item for item in items}
+    for item in items:
+        benchmark = items_by_code[item["benchmark_code"]]
+        item["benchmark_exchange"] = benchmark["exchange"]
 
-    print("Computing column ranges...")
-    column_ranges = {}
-    for group_name, rows in groups_data.items():
-        daily_v = [r["daily"] for r in rows if r.get("daily") is not None]
-        intra_v = [r["intra"] for r in rows if r.get("intra") is not None]
-        five_v = [r["5d"] for r in rows if r.get("5d") is not None]
-        twenty_v = [r["20d"] for r in rows if r.get("20d") is not None]
-        column_ranges[group_name] = {
-            "daily": (min(daily_v) if daily_v else -10, max(daily_v) if daily_v else 10),
-            "intra": (min(intra_v) if intra_v else -10, max(intra_v) if intra_v else 10),
-            "5d": (min(five_v) if five_v else -20, max(five_v) if five_v else 20),
-            "20d": (min(twenty_v) if twenty_v else -30, max(twenty_v) if twenty_v else 30),
-        }
+    out_dir = ROOT / args.out_dir
+    charts_dir = out_dir / "charts"
+    charts_dir.mkdir(parents=True, exist_ok=True)
 
+    history_cache: Dict[str, pd.DataFrame] = {}
+    groups: Dict[str, List[Dict[str, object]]] = {group_name: [] for group_name in universe["group_order"]}
+
+    for item in items:
+        benchmark_name = items_by_code[item["benchmark_code"]]["label"]
+        print(f"[{item['group']}] {item['code']} {item['label']}")
+        row = build_row(item, benchmark_name, history_cache, charts_dir)
+        groups[item["group"]].append(row)
+
+    latest_market_date = max(row["market_date"] for rows in groups.values() for row in rows)
+    for group_name in universe["group_order"]:
+        assign_group_ranks(groups[group_name])
+        groups[group_name].sort(key=lambda row: (row["rs_21d"], row["5d"]), reverse=True)
+
+    built_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     snapshot = {
-        "built_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "groups": groups_data,
-        "column_ranges": column_ranges,
+        "built_at": built_at,
+        "market_date": latest_market_date,
+        "groups": groups,
+        "column_ranges": build_column_ranges(groups),
     }
     meta = {
-        "SECTOR_COLORS": SECTOR_COLORS,
-        "TICKER_TO_SECTOR": TICKER_TO_SECTOR,
-        "Industries_COLORS": Industries_COLORS,
-        "SECTOR_ORDER": list(SECTOR_COLORS.keys()),
-        "default_symbol": STOCK_GROUPS["Indices"][0] if STOCK_GROUPS["Indices"] else "SPY",
+        "title": "China ETF Rotation Dashboard",
+        "source": "AkShare / Sina ETF history",
+        "group_order": universe["group_order"],
+        "group_colors": universe["group_colors"],
+        "default_symbol": universe["default_symbol"],
     }
+    breadth = build_breadth(groups, universe["group_order"], built_at)
 
-    snapshot_path = os.path.join(out_dir, "snapshot.json")
-    meta_path = os.path.join(out_dir, "meta.json")
+    write_json(out_dir / "snapshot.json", snapshot)
+    write_json(out_dir / "meta.json", meta)
+    write_json(out_dir / "breadth.json", breadth)
 
-    with open(snapshot_path, "w", encoding="utf-8") as f:
-        json.dump(snapshot, f, ensure_ascii=False, indent=2)
-    with open(meta_path, "w", encoding="utf-8") as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
-
-    print("Wrote", snapshot_path, meta_path, "and charts in", charts_dir)
-
-    # Also fetch ETF holdings automatically
-    print("\nFetching ETF holdings...")
-    etfs = get_all_etfs()
-    fetch_etf_holdings(etfs, out_dir)
+    print(f"Wrote {out_dir / 'snapshot.json'}")
+    print(f"Wrote {out_dir / 'meta.json'}")
+    print(f"Wrote {out_dir / 'breadth.json'}")
 
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "--holdings":
-        main_holdings()
-    else:
-        main()
+    main()

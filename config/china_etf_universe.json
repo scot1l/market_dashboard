@@ -1,0 +1,155 @@
+{
+  "group_order": [
+    "Broad",
+    "Growth",
+    "Cyclicals",
+    "Domestic Demand",
+    "Defense"
+  ],
+  "group_colors": {
+    "Broad": "#4f46e5",
+    "Growth": "#0891b2",
+    "Cyclicals": "#ea580c",
+    "Domestic Demand": "#16a34a",
+    "Defense": "#a16207"
+  },
+  "default_symbol": "510300",
+  "items": [
+    {
+      "code": "510300",
+      "exchange": "SSE",
+      "name": "沪深300ETF",
+      "label": "沪深300",
+      "group": "Broad",
+      "benchmark_code": "510300"
+    },
+    {
+      "code": "510500",
+      "exchange": "SSE",
+      "name": "中证500ETF",
+      "label": "中证500",
+      "group": "Broad",
+      "benchmark_code": "510300"
+    },
+    {
+      "code": "159915",
+      "exchange": "SZSE",
+      "name": "创业板ETF",
+      "label": "创业板",
+      "group": "Broad",
+      "benchmark_code": "510300"
+    },
+    {
+      "code": "588000",
+      "exchange": "SSE",
+      "name": "科创50ETF",
+      "label": "科创50",
+      "group": "Broad",
+      "benchmark_code": "159915"
+    },
+    {
+      "code": "512480",
+      "exchange": "SSE",
+      "name": "半导体ETF",
+      "label": "半导体",
+      "group": "Growth",
+      "benchmark_code": "159915"
+    },
+    {
+      "code": "159819",
+      "exchange": "SZSE",
+      "name": "人工智能ETF",
+      "label": "人工智能",
+      "group": "Growth",
+      "benchmark_code": "159915"
+    },
+    {
+      "code": "516510",
+      "exchange": "SSE",
+      "name": "云计算ETF",
+      "label": "云计算",
+      "group": "Growth",
+      "benchmark_code": "159915"
+    },
+    {
+      "code": "515790",
+      "exchange": "SSE",
+      "name": "光伏ETF",
+      "label": "光伏",
+      "group": "Growth",
+      "benchmark_code": "159915"
+    },
+    {
+      "code": "515030",
+      "exchange": "SSE",
+      "name": "新能源车ETF",
+      "label": "新能源车",
+      "group": "Growth",
+      "benchmark_code": "159915"
+    },
+    {
+      "code": "512880",
+      "exchange": "SSE",
+      "name": "证券ETF",
+      "label": "证券",
+      "group": "Cyclicals",
+      "benchmark_code": "510300"
+    },
+    {
+      "code": "512800",
+      "exchange": "SSE",
+      "name": "银行ETF",
+      "label": "银行",
+      "group": "Cyclicals",
+      "benchmark_code": "510300"
+    },
+    {
+      "code": "512660",
+      "exchange": "SSE",
+      "name": "军工ETF",
+      "label": "军工",
+      "group": "Cyclicals",
+      "benchmark_code": "510300"
+    },
+    {
+      "code": "516970",
+      "exchange": "SSE",
+      "name": "基建ETF",
+      "label": "基建",
+      "group": "Cyclicals",
+      "benchmark_code": "510300"
+    },
+    {
+      "code": "159928",
+      "exchange": "SZSE",
+      "name": "消费ETF",
+      "label": "消费",
+      "group": "Domestic Demand",
+      "benchmark_code": "510300"
+    },
+    {
+      "code": "512170",
+      "exchange": "SSE",
+      "name": "医疗ETF",
+      "label": "医疗",
+      "group": "Domestic Demand",
+      "benchmark_code": "159915"
+    },
+    {
+      "code": "512690",
+      "exchange": "SSE",
+      "name": "酒ETF",
+      "label": "酒",
+      "group": "Domestic Demand",
+      "benchmark_code": "510300"
+    },
+    {
+      "code": "518880",
+      "exchange": "SSE",
+      "name": "黄金ETF",
+      "label": "黄金",
+      "group": "Defense",
+      "benchmark_code": "510300"
+    }
+  ]
+}
