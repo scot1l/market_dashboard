@@ -83,12 +83,14 @@
         .breadth-signal-label { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
         .breadth-signal-value { margin-top:10px; font-size:24px; font-weight:700; line-height:1; }
         .breadth-signal-detail { margin-top:8px; font-size:12px; line-height:1.4; color:var(--muted); }
-        .breadth-layout { display:grid; gap:12px; grid-template-columns:1.45fr 1fr; margin-top:12px; }
-        .breadth-subpanel { background:rgba(6,12,24,.72); border:1px solid rgba(148,163,184,.1); border-radius:12px; padding:12px; }
-        .breadth-subtitle { margin:0 0 10px; font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+        .breadth-layout { display:grid; gap:12px; grid-template-columns:minmax(0,1.2fr) minmax(320px,1fr); margin-top:12px; }
+        .breadth-subpanel { min-width:0; background:rgba(6,12,24,.72); border:1px solid rgba(148,163,184,.1); border-radius:12px; padding:12px; }
+        .breadth-subtitle { margin:0 0 10px; font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); white-space:nowrap; }
         .breadth-list { display:grid; gap:8px; }
         .breadth-row { display:grid; grid-template-columns:minmax(0,1.6fr) repeat(4,auto); gap:10px; align-items:center; padding:10px 0; border-top:1px solid rgba(148,163,184,.08); }
         .breadth-row:first-child { border-top:none; padding-top:0; }
+        .breadth-row.compact { grid-template-columns:minmax(0,1fr) auto; align-items:start; }
+        .breadth-row.dual { grid-template-columns:minmax(0,1fr) auto; }
         .breadth-name { font-size:14px; font-weight:700; line-height:1.25; }
         .breadth-meta { margin-top:4px; font-size:12px; line-height:1.45; color:var(--muted); }
         .breadth-stat { min-width:64px; text-align:right; font-size:13px; font-weight:700; }
@@ -96,11 +98,15 @@
         .breadth-chip { display:inline-flex; align-items:center; gap:6px; margin-top:6px; padding:4px 8px; border-radius:999px; border:1px solid rgba(148,163,184,.16); background:rgba(15,23,42,.72); color:var(--muted); font-size:11px; letter-spacing:.05em; text-transform:uppercase; }
         .breadth-chip.positive { color:var(--up); border-color:rgba(34,197,94,.24); }
         .breadth-chip.negative { color:var(--down); border-color:rgba(239,68,68,.24); }
+        .breadth-metrics { display:grid; grid-template-columns:repeat(2,minmax(58px,auto)); gap:8px 12px; justify-content:end; }
+        .breadth-metric-stack { text-align:right; }
+        .breadth-metric-label { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+        .breadth-metric-value { margin-top:4px; font-size:13px; font-weight:700; }
         .breadth-notes { margin:0; padding-left:18px; color:var(--muted); font-size:12px; line-height:1.55; }
         .breadth-note { margin:0 0 6px; }
         @media (max-width:1280px) { .app { flex-direction:column; align-items:stretch; } .sidebar { width:100%; border-right:none; border-bottom:1px solid var(--line); } .chart-pane { position:static; top:auto; max-height:none; min-width:0; overflow:visible; } .chart-box { height:clamp(360px, 58vh, 620px); } .overview-grid, .group-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
         @media (max-width:1280px) { .breadth-signal-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .breadth-layout { grid-template-columns:1fr; } }
-        @media (max-width:760px) { .sidebar,.chart-pane { padding:12px; } .brand h1, .breadth-title { font-size:25px; } .overview-grid, .group-grid, .guide-grid, .breadth-signal-grid { grid-template-columns:1fr; } .breadth-row { grid-template-columns:1fr 1fr; } .chart-box { min-height:320px; height:360px; } }
+        @media (max-width:760px) { .sidebar,.chart-pane { padding:12px; } .brand h1, .breadth-title { font-size:25px; } .overview-grid, .group-grid, .guide-grid, .breadth-signal-grid { grid-template-columns:1fr; } .breadth-row, .breadth-row.compact, .breadth-row.dual { grid-template-columns:1fr 1fr; } .breadth-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); justify-content:stretch; } .chart-box { min-height:320px; height:360px; } }
     </style>
 </head>
 <body>
@@ -267,6 +273,10 @@
             return prefix + (amount >= 10000 ? (amount / 10000).toFixed(2) + '万亿' : amount.toFixed(0) + '亿');
         }
 
+        function metricStack(label, value, tone) {
+            return '<div class="breadth-metric-stack"><div class="breadth-metric-label">' + esc(label) + '</div><div class="breadth-metric-value ' + tone + '">' + esc(value) + '</div></div>';
+        }
+
         function breadthSignalCard(item) {
             return '<div class="breadth-signal ' + toneClass(item.tone) + '"><div class="breadth-signal-label">' + esc(item.label) + '</div><div class="breadth-signal-value">' + esc(item.display) + '</div><div class="breadth-signal-detail">' + esc(item.detail) + '</div></div>';
         }
@@ -276,12 +286,12 @@
         }
 
         function renderConceptRow(item) {
-            return '<div class="breadth-row"><div><div class="breadth-name">' + esc(item.name) + '</div><div class="breadth-meta">' + esc(item.leader) + ' ' + esc(signedShort(item.leader_change_pct, 1)) + '</div><div class="breadth-chip positive">Heat ' + esc(String(Math.round(item.heat_score))) + '</div></div><div class="breadth-stat ' + klass(item.change_pct) + '">' + esc(signedShort(item.change_pct, 1)) + '</div><div class="breadth-stat ' + klass(item.change_5d_pct) + '">' + esc(signedShort(item.change_5d_pct, 1)) + '</div><div class="breadth-stat ' + klass(item.change_20d_pct) + '">' + esc(signedShort(item.change_20d_pct, 1)) + '</div><div class="breadth-stat wide">' + esc(flowValue(item.net_flow_100m)) + '</div></div>';
+            return '<div class="breadth-row compact"><div><div class="breadth-name">' + esc(item.name) + '</div><div class="breadth-meta">' + esc(item.leader) + ' ' + esc(signedShort(item.leader_change_pct, 1)) + '</div><div class="breadth-chip positive">Heat ' + esc(String(Math.round(item.heat_score))) + '</div></div><div class="breadth-metrics">' + metricStack('1D', signedShort(item.change_pct, 1), klass(item.change_pct)) + metricStack('5D', signedShort(item.change_5d_pct, 1), klass(item.change_5d_pct)) + metricStack('20D', signedShort(item.change_20d_pct, 1), klass(item.change_20d_pct)) + metricStack('Flow', flowValue(item.net_flow_100m), klass(item.net_flow_100m)) + '</div></div>';
         }
 
         function renderLeadershipRow(item, negative) {
             const scoreLabel = negative ? 'Fake ' + Math.round(item.fake_score) : 'Strength ' + Math.round(item.strength_score) + ' | Persistence ' + Math.round(item.persistence_score);
-            return '<div class="breadth-row"><div><div class="breadth-name">' + esc(item.name) + '</div><div class="breadth-meta">' + esc(item.detail) + '</div><div class="breadth-chip ' + (negative ? 'negative' : 'positive') + '">' + esc(negative ? scoreLabel : item.leadership) + '</div></div><div class="breadth-stat wide">' + esc(scoreLabel) + '</div><div class="breadth-stat"></div><div class="breadth-stat"></div><div class="breadth-stat"></div></div>';
+            return '<div class="breadth-row dual"><div><div class="breadth-name">' + esc(item.name) + '</div><div class="breadth-meta">' + esc(item.detail) + '</div><div class="breadth-chip ' + (negative ? 'negative' : 'positive') + '">' + esc(negative ? scoreLabel : item.leadership) + '</div></div><div class="breadth-stat wide">' + esc(scoreLabel) + '</div></div>';
         }
 
         function renderSwingBreadth() {
