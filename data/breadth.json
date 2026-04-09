@@ -1,64 +1,64 @@
 {
-  "built_at": "2026-04-08T14:59:31.620230Z",
+  "built_at": "2026-04-09T13:55:06.235013Z",
   "groups": [
     {
       "group": "Broad",
       "count": 4,
-      "avg_daily": 5.26,
-      "avg_5d": 5.08,
-      "avg_20d": -2.57,
-      "avg_rs_21d": 8.0,
+      "avg_daily": -0.72,
+      "avg_5d": 2.22,
+      "avg_20d": -3.39,
+      "avg_rs_21d": 22.0,
       "above_ema20": 4,
       "above_sma50": 1,
       "leaders": [
         {
+          "code": "510300",
+          "label": "沪深300",
+          "rs_21d": 50.0
+        },
+        {
           "code": "159915",
           "label": "创业板",
-          "rs_21d": 25.0
+          "rs_21d": 30.0
         },
         {
           "code": "588000",
           "label": "科创50",
           "rs_21d": 5.0
-        },
-        {
-          "code": "510500",
-          "label": "中证500",
-          "rs_21d": 0.0
         }
       ],
       "laggards": [
         {
-          "code": "510500",
-          "label": "中证500",
-          "rs_21d": 0.0
-        },
-        {
-          "code": "510300",
-          "label": "沪深300",
-          "rs_21d": 0.0
-        },
-        {
           "code": "588000",
           "label": "科创50",
           "rs_21d": 5.0
+        },
+        {
+          "code": "510500",
+          "label": "中证500",
+          "rs_21d": 5.0
+        },
+        {
+          "code": "159915",
+          "label": "创业板",
+          "rs_21d": 30.0
         }
       ]
     },
     {
       "group": "Growth",
       "count": 5,
-      "avg_daily": 6.07,
-      "avg_5d": 4.9,
-      "avg_20d": -4.28,
-      "avg_rs_21d": 17.0,
+      "avg_daily": -0.74,
+      "avg_5d": 2.04,
+      "avg_20d": -5.12,
+      "avg_rs_21d": 20.0,
       "above_ema20": 4,
-      "above_sma50": 2,
+      "above_sma50": 1,
       "leaders": [
         {
           "code": "159819",
           "label": "人工智能",
-          "rs_21d": 35.0
+          "rs_21d": 45.0
         },
         {
           "code": "516510",
@@ -80,7 +80,7 @@
         {
           "code": "515790",
           "label": "光伏",
-          "rs_21d": 0.0
+          "rs_21d": 5.0
         },
         {
           "code": "516510",
@@ -92,99 +92,99 @@
     {
       "group": "Cyclicals",
       "count": 4,
-      "avg_daily": 3.32,
-      "avg_5d": 1.39,
-      "avg_20d": -5.0,
-      "avg_rs_21d": 16.0,
-      "above_ema20": 2,
+      "avg_daily": -1.15,
+      "avg_5d": -0.5,
+      "avg_20d": -6.54,
+      "avg_rs_21d": 15.0,
+      "above_ema20": 0,
       "above_sma50": 1,
       "leaders": [
         {
           "code": "512800",
           "label": "银行",
-          "rs_21d": 65.0
-        },
-        {
-          "code": "512880",
-          "label": "证券",
-          "rs_21d": 0.0
+          "rs_21d": 50.0
         },
         {
           "code": "512660",
           "label": "军工",
-          "rs_21d": 0.0
-        }
-      ],
-      "laggards": [
-        {
-          "code": "512880",
-          "label": "证券",
-          "rs_21d": 0.0
-        },
-        {
-          "code": "512660",
-          "label": "军工",
-          "rs_21d": 0.0
+          "rs_21d": 10.0
         },
         {
           "code": "516970",
           "label": "基建",
           "rs_21d": 0.0
         }
+      ],
+      "laggards": [
+        {
+          "code": "516970",
+          "label": "基建",
+          "rs_21d": 0.0
+        },
+        {
+          "code": "512880",
+          "label": "证券",
+          "rs_21d": 0.0
+        },
+        {
+          "code": "512660",
+          "label": "军工",
+          "rs_21d": 10.0
+        }
       ]
     },
     {
       "group": "Domestic Demand",
       "count": 3,
-      "avg_daily": 1.72,
-      "avg_5d": 1.92,
-      "avg_20d": -1.6,
-      "avg_rs_21d": 42.0,
-      "above_ema20": 2,
+      "avg_daily": -1.27,
+      "avg_5d": -1.2,
+      "avg_20d": -2.98,
+      "avg_rs_21d": 18.0,
+      "above_ema20": 1,
       "above_sma50": 0,
       "leaders": [
         {
           "code": "159928",
           "label": "消费",
-          "rs_21d": 60.0
+          "rs_21d": 25.0
         },
         {
           "code": "512690",
           "label": "酒",
-          "rs_21d": 45.0
+          "rs_21d": 20.0
         },
         {
           "code": "512170",
           "label": "医疗",
-          "rs_21d": 20.0
+          "rs_21d": 10.0
         }
       ],
       "laggards": [
         {
           "code": "512170",
           "label": "医疗",
-          "rs_21d": 20.0
+          "rs_21d": 10.0
         },
         {
           "code": "512690",
           "label": "酒",
-          "rs_21d": 45.0
+          "rs_21d": 20.0
         },
         {
           "code": "159928",
           "label": "消费",
-          "rs_21d": 60.0
+          "rs_21d": 25.0
         }
       ]
     },
     {
       "group": "Defense",
       "count": 1,
-      "avg_daily": 2.81,
-      "avg_5d": 4.27,
-      "avg_20d": -7.69,
+      "avg_daily": -2.03,
+      "avg_5d": -1.16,
+      "avg_20d": -9.71,
       "avg_rs_21d": 0.0,
-      "above_ema20": 1,
+      "above_ema20": 0,
       "above_sma50": 0,
       "leaders": [
         {
@@ -204,9 +204,9 @@
   ],
   "overview": {
     "market_tone": "Mixed",
-    "strongest_group": "Domestic Demand",
+    "strongest_group": "Broad",
     "weakest_group": "Defense",
-    "above_ema20_pct": 76.0,
-    "above_sma50_pct": 24.0
+    "above_ema20_pct": 53.0,
+    "above_sma50_pct": 18.0
   }
 }

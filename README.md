@@ -46,6 +46,7 @@ The builder writes:
 - `data/snapshot.json`
 - `data/meta.json`
 - `data/breadth.json`
+- `data/breadth_swing.json` (optional; skipped when live breadth sources are unavailable or out of sync)
 - `data/charts/*.png`
 
 ## Recommended usage

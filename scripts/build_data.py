@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+from collections import Counter
 from datetime import datetime, timezone
+from functools import lru_cache
+from io import StringIO
 from pathlib import Path
 from typing import Dict, List
 
 import akshare as ak
 import matplotlib
 import pandas as pd
+from akshare.stock_feature import stock_fund_flow as ak_ths_fund_flow
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -265,6 +270,776 @@ def build_breadth(groups: Dict[str, List[Dict[str, object]]], group_order: List[
     }
 
 
+def parse_number(value: object) -> float | None:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    if isinstance(value, str):
+        normalized = value.strip().replace(",", "")
+        if not normalized:
+            return None
+        if normalized.endswith("%"):
+            normalized = normalized[:-1]
+        try:
+            return float(normalized)
+        except ValueError:
+            return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def scale_unit_interval(value: float, low: float, high: float) -> float:
+    if high <= low:
+        return 0.5
+    return max(0.0, min(1.0, (value - low) / (high - low)))
+
+
+def series_rank_pct(series: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(series, errors="coerce")
+    valid = numeric.dropna()
+    ranked = pd.Series(0.5, index=numeric.index, dtype=float)
+    if valid.empty or len(valid) == 1:
+        return ranked
+    ranks = valid.rank(method="average")
+    ranked.loc[valid.index] = (ranks - 1) / (len(valid) - 1)
+    return ranked
+
+
+def tone_from_score(score: float, strong: float = 70, weak: float = 40) -> str:
+    if score >= strong:
+        return "positive"
+    if score <= weak:
+        return "negative"
+    return "neutral"
+
+
+def tone_from_signed(value: float, positive_floor: float = 0.0, negative_floor: float = 0.0) -> str:
+    if value > positive_floor:
+        return "positive"
+    if value < negative_floor:
+        return "negative"
+    return "neutral"
+
+
+def format_money_100m(value: float) -> str:
+    if abs(value) >= 10000:
+        return f"{value / 10000:.2f}万亿"
+    return f"{value:.0f}亿"
+
+
+def format_turnover_trillion(value: float) -> str:
+    return f"{value:.2f}万亿"
+
+
+def normalize_sector_name(value: object) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"\s+", "", text)
+    text = text.translate(str.maketrans("", "", "ⅠⅡⅢⅣⅤ()（）"))
+    return text
+
+
+def rolling_return(series: pd.Series, lookback: int) -> float:
+    cleaned = pd.to_numeric(series, errors="coerce").dropna().reset_index(drop=True)
+    if len(cleaned) <= lookback:
+        return 0.0
+    return float((cleaned.iloc[-1] / cleaned.iloc[-lookback - 1] - 1) * 100)
+
+
+def positive_day_count(series: pd.Series, lookback: int) -> int:
+    changes = pd.to_numeric(series, errors="coerce").pct_change().dropna().tail(lookback)
+    return int((changes > 0).sum())
+
+
+def first_valid(values: pd.Series, default: float = 0.0) -> float:
+    numeric = pd.to_numeric(values, errors="coerce").dropna()
+    if numeric.empty:
+        return default
+    return float(numeric.iloc[0])
+
+
+def parse_trade_date(value: object) -> str | None:
+    if value is None:
+        return None
+    parsed = pd.to_datetime(value, errors="coerce")
+    if pd.isna(parsed):
+        return None
+    return parsed.date().isoformat()
+
+
+def ensure_trade_date(source: str, actual_date: str | None, expected_date: str) -> None:
+    if actual_date is None:
+        raise ValueError(f"{source} trade date is missing")
+    if actual_date != expected_date:
+        raise ValueError(f"{source} trade date {actual_date} does not match snapshot market date {expected_date}")
+
+
+def fetch_market_activity() -> Dict[str, object]:
+    frame = ak.stock_market_activity_legu()
+    activity: Dict[str, object] = {}
+    for _, row in frame.iterrows():
+        key = str(row["item"]).strip()
+        parsed = parse_number(row["value"])
+        activity[key] = parsed if parsed is not None else str(row["value"]).strip()
+    trade_date = parse_trade_date(activity.get("统计日期"))
+    if trade_date is None:
+        raise ValueError("Market activity date is missing")
+    activity["trade_date"] = trade_date
+    return activity
+
+
+def fetch_northbound_summary() -> Dict[str, object]:
+    frame = ak.stock_hsgt_fund_flow_summary_em()
+    north = frame[frame["资金方向"] == "北向"].copy()
+    if north.empty:
+        raise ValueError("Northbound summary is empty")
+    latest_trade_date = north["交易日"].max()
+    if pd.isna(latest_trade_date):
+        raise ValueError("Northbound trade date is missing")
+    north = north[north["交易日"] == latest_trade_date].copy()
+    return {
+        "trade_date": latest_trade_date.isoformat(),
+        "net_flow_100m": round(float(north["资金净流入"].sum()), 2),
+        "up_count": int(north["上涨数"].sum()),
+        "flat_count": int(north["持平数"].sum()),
+        "down_count": int(north["下跌数"].sum()),
+        "sh_index_change_pct": round(first_valid(north.loc[north["板块"] == "沪股通", "指数涨跌幅"]), 2),
+        "sz_index_change_pct": round(first_valid(north.loc[north["板块"] == "深股通", "指数涨跌幅"]), 2),
+    }
+
+
+@lru_cache(maxsize=64)
+def fetch_sse_stock_turnover(date: str) -> float:
+    frame = ak.stock_sse_deal_daily(date=date)
+    row = frame.loc[frame["单日情况"] == "成交金额", "股票"]
+    if row.empty:
+        raise ValueError(f"Missing SSE turnover for {date}")
+    value = parse_number(row.iloc[0])
+    if value is None:
+        raise ValueError(f"Invalid SSE turnover for {date}")
+    return value * 100000000
+
+
+@lru_cache(maxsize=64)
+def fetch_szse_stock_turnover(date: str) -> float:
+    frame = ak.stock_szse_summary(date=date)
+    row = frame.loc[frame["证券类别"] == "股票", "成交金额"]
+    if row.empty:
+        raise ValueError(f"Missing SZSE turnover for {date}")
+    value = parse_number(row.iloc[0])
+    if value is None:
+        raise ValueError(f"Invalid SZSE turnover for {date}")
+    return value
+
+
+def build_turnover_series(trading_dates: List[pd.Timestamp]) -> List[Dict[str, object]]:
+    series = []
+    for date in trading_dates:
+        date_str = date.strftime("%Y%m%d")
+        total = fetch_sse_stock_turnover(date_str) + fetch_szse_stock_turnover(date_str)
+        series.append({"date": date.date().isoformat(), "turnover": total})
+    return series
+
+
+def ths_hexin_v() -> str:
+    js = ak_ths_fund_flow.py_mini_racer.MiniRacer()
+    js.eval(ak_ths_fund_flow._get_file_content_ths("ths.js"))
+    return js.call("v")
+
+
+def fetch_ths_fund_flow(kind: str, window: str) -> pd.DataFrame:
+    if kind not in {"industry", "concept"}:
+        raise ValueError(f"Unsupported THS flow kind: {kind}")
+    if window not in {"today", "5d", "20d"}:
+        raise ValueError(f"Unsupported THS flow window: {window}")
+
+    path = "hyzjl" if kind == "industry" else "gnzjl"
+    referer = f"http://data.10jqka.com.cn/funds/{path}/"
+    board_segment = "" if window == "today" else f"board/{window[:-1]}/"
+    first_url = f"http://data.10jqka.com.cn/funds/{path}/{board_segment}field/tradezdf/order/desc/ajax/1/free/1/"
+    page_url = f"http://data.10jqka.com.cn/funds/{path}/{board_segment}field/tradezdf/order/desc/page/{{}}/ajax/1/free/1/"
+    def request(url: str):
+        headers = {
+            "Accept": "text/html, */*; q=0.01",
+            "Accept-Encoding": "gzip, deflate",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "hexin-v": ths_hexin_v(),
+            "Host": "data.10jqka.com.cn",
+            "Pragma": "no-cache",
+            "Referer": referer,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "X-Requested-With": "XMLHttpRequest",
+        }
+        return ak_ths_fund_flow.requests.get(url, headers=headers)
+
+    response = request(first_url)
+    tables = [pd.read_html(StringIO(response.text))[0]]
+    soup = ak_ths_fund_flow.BeautifulSoup(response.text, features="lxml")
+    page_info = soup.find(name="span", attrs={"class": "page_info"})
+    page_count = int(page_info.text.split("/")[1]) if page_info else 1
+
+    for page in range(2, page_count + 1):
+        response = request(page_url.format(page))
+        tables.append(pd.read_html(StringIO(response.text))[0])
+
+    frame = pd.concat(tables, ignore_index=True)
+    if window == "today":
+        if frame.shape[1] != 11:
+            raise ValueError(f"Unexpected THS today flow shape: {frame.shape}")
+        frame.columns = [
+            "rank",
+            "name",
+            "index_value",
+            "change_pct",
+            "inflow_100m",
+            "outflow_100m",
+            "net_flow_100m",
+            "company_count",
+            "leader",
+            "leader_change_pct",
+            "leader_last_price",
+        ]
+        for column in ["change_pct", "leader_change_pct"]:
+            frame[column] = frame[column].astype(str).str.rstrip("%")
+        numeric_columns = [
+            "rank",
+            "index_value",
+            "change_pct",
+            "inflow_100m",
+            "outflow_100m",
+            "net_flow_100m",
+            "company_count",
+            "leader_change_pct",
+            "leader_last_price",
+        ]
+    else:
+        if frame.shape[1] != 8:
+            raise ValueError(f"Unexpected THS ranked flow shape: {frame.shape}")
+        frame.columns = [
+            "rank",
+            "name",
+            "company_count",
+            "index_value",
+            "period_change_pct",
+            "inflow_100m",
+            "outflow_100m",
+            "net_flow_100m",
+        ]
+        frame["period_change_pct"] = frame["period_change_pct"].astype(str).str.rstrip("%")
+        numeric_columns = [
+            "rank",
+            "company_count",
+            "index_value",
+            "period_change_pct",
+            "inflow_100m",
+            "outflow_100m",
+            "net_flow_100m",
+        ]
+
+    for column in numeric_columns:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    return frame
+
+
+def fetch_industry_summary_ths() -> pd.DataFrame:
+    def request(page: int):
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Cookie": f"v={ths_hexin_v()}",
+        }
+        url = f"http://q.10jqka.com.cn/thshy/index/field/199112/order/desc/page/{page}/ajax/1/"
+        return ak_ths_fund_flow.requests.get(url, headers=headers)
+
+    response = request(1)
+    tables = [pd.read_html(StringIO(response.text))[0]]
+    soup = ak_ths_fund_flow.BeautifulSoup(response.text, features="lxml")
+    page_info = soup.find(name="span", attrs={"class": "page_info"})
+    page_count = int(page_info.text.split("/")[1]) if page_info else 1
+
+    for page in range(2, page_count + 1):
+        response = request(page)
+        tables.append(pd.read_html(StringIO(response.text))[0])
+
+    frame = pd.concat(tables, ignore_index=True)
+    frame.columns = [
+        "序号",
+        "板块",
+        "涨跌幅",
+        "总成交量",
+        "总成交额",
+        "净流入",
+        "上涨家数",
+        "下跌家数",
+        "均价",
+        "领涨股",
+        "领涨股-最新价",
+        "领涨股-涨跌幅",
+    ]
+    for column in ["涨跌幅", "总成交量", "总成交额", "净流入", "上涨家数", "下跌家数", "均价", "领涨股-最新价", "领涨股-涨跌幅"]:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    return frame
+
+
+@lru_cache(maxsize=256)
+def fetch_industry_index_history(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+    return ak.stock_board_industry_index_ths(symbol=symbol, start_date=start_date, end_date=end_date)
+
+
+def build_industry_pool_counts(frame: pd.DataFrame) -> Counter:
+    counts: Counter = Counter()
+    if "所属行业" not in frame.columns:
+        return counts
+    for name in frame["所属行业"].dropna():
+        counts[normalize_sector_name(name)] += 1
+    return counts
+
+
+def describe_persistence(score: float) -> str:
+    if score >= 80:
+        return "Persistent"
+    if score >= 60:
+        return "Broadening"
+    if score >= 45:
+        return "Early"
+    return "Fragile"
+
+
+def describe_leadership(score: float) -> str:
+    if score >= 78:
+        return "Institutional"
+    if score >= 62:
+        return "Credible"
+    if score >= 48:
+        return "Watchlist"
+    return "Speculative"
+
+
+def describe_fake_risk(flags: List[str]) -> str:
+    return "; ".join(flags[:3]) if flags else "Narrow leadership"
+
+
+def build_regime_summary(turnover_ratio: float, northbound_flow: float, advancers: int, decliners: int, above_50_pct: float) -> str:
+    phrases = []
+    phrases.append("turnover is expanding" if turnover_ratio >= 1.05 else "turnover is below its 20-day baseline")
+    phrases.append("northbound is supportive" if northbound_flow > 0 else "northbound is not confirming")
+    phrases.append("breadth is broad" if advancers > decliners * 2 else "breadth is mixed")
+    phrases.append("medium-term participation is healthy" if above_50_pct >= 55 else "medium-term participation is still selective")
+    return ", ".join(phrases) + "."
+
+
+def build_swing_breadth(
+    market_date: str,
+    built_at: str,
+    benchmark_history: pd.DataFrame,
+) -> Dict[str, object]:
+    market_date_dt = pd.to_datetime(market_date)
+    market_date_compact = market_date_dt.strftime("%Y%m%d")
+
+    trading_dates = benchmark_history["date"].dropna().drop_duplicates().sort_values().tail(20).tolist()
+    turnover_series = build_turnover_series(trading_dates)
+    latest_turnover = turnover_series[-1]["turnover"]
+    average_turnover = sum(item["turnover"] for item in turnover_series) / len(turnover_series)
+    turnover_ratio = latest_turnover / average_turnover if average_turnover else 1.0
+
+    market_activity = fetch_market_activity()
+    northbound = fetch_northbound_summary()
+    ensure_trade_date("Market activity", market_activity.get("trade_date"), market_date)
+    ensure_trade_date("Northbound summary", northbound.get("trade_date"), market_date)
+
+    industry_today = fetch_ths_fund_flow("industry", "today")
+    industry_5d = fetch_ths_fund_flow("industry", "5d")[["name", "period_change_pct", "net_flow_100m"]].rename(
+        columns={"period_change_pct": "change_5d_pct", "net_flow_100m": "net_flow_5d_100m"}
+    )
+    industry_20d = fetch_ths_fund_flow("industry", "20d")[["name", "period_change_pct", "net_flow_100m"]].rename(
+        columns={"period_change_pct": "change_20d_pct", "net_flow_100m": "net_flow_20d_100m"}
+    )
+
+    history_start = benchmark_history["date"].dropna().sort_values().iloc[-80].strftime("%Y%m%d")
+    industry_rows = []
+    for _, row in industry_today.iterrows():
+        history = fetch_industry_index_history(row["name"], history_start, market_date_compact)
+        close = history["收盘价"]
+        amount = history["成交额"]
+        sma20 = float(close.rolling(window=20).mean().iloc[-1])
+        sma50 = float(close.rolling(window=50).mean().iloc[-1])
+        industry_rows.append(
+            {
+                "name": row["name"],
+                "company_count": int(row["company_count"]),
+                "above_20dma": bool(close.iloc[-1] > sma20),
+                "above_50dma": bool(close.iloc[-1] > sma50),
+                "change_5d_pct_hist": round(rolling_return(close, 5), 2),
+                "change_20d_pct_hist": round(rolling_return(close, 20), 2),
+                "positive_days_5": positive_day_count(close, 5),
+                "amount_ratio_20d": round(float(amount.iloc[-1] / amount.tail(20).mean()), 2),
+            }
+        )
+
+    industry_frame = pd.DataFrame(industry_rows).merge(industry_5d, on="name", how="left").merge(industry_20d, on="name", how="left")
+    industry_summary = fetch_industry_summary_ths()
+    industry_summary = industry_summary.rename(
+        columns={
+            "板块": "name",
+            "涨跌幅": "change_pct",
+            "净流入": "net_flow_100m",
+            "上涨家数": "up_count",
+            "下跌家数": "down_count",
+            "领涨股": "leader",
+            "领涨股-涨跌幅": "leader_change_pct",
+        }
+    )
+    industry_summary = industry_summary[["name", "change_pct", "net_flow_100m", "up_count", "down_count", "leader", "leader_change_pct"]]
+    for column in ["change_pct", "net_flow_100m", "leader_change_pct"]:
+        industry_summary[column] = pd.to_numeric(industry_summary[column], errors="coerce")
+
+    industry_frame = industry_frame.merge(industry_summary, on="name", how="left")
+    industry_frame["change_pct"] = industry_frame["change_pct"].fillna(0.0)
+    industry_frame["change_5d_pct"] = industry_frame["change_5d_pct"].fillna(industry_frame["change_5d_pct_hist"])
+    industry_frame["change_20d_pct"] = industry_frame["change_20d_pct"].fillna(industry_frame["change_20d_pct_hist"])
+    industry_frame["net_flow_5d_100m"] = industry_frame["net_flow_5d_100m"].fillna(0.0)
+    industry_frame["net_flow_20d_100m"] = industry_frame["net_flow_20d_100m"].fillna(0.0)
+    industry_frame["net_flow_100m"] = industry_frame["net_flow_100m"].fillna(0.0)
+    industry_frame["up_count"] = industry_frame["up_count"].fillna(industry_frame["company_count"]).astype(int)
+    industry_frame["down_count"] = industry_frame["down_count"].fillna(0).astype(int)
+    industry_frame["breadth_ratio"] = industry_frame["up_count"] / (industry_frame["up_count"] + industry_frame["down_count"]).replace(0, pd.NA)
+    industry_frame["breadth_ratio"] = industry_frame["breadth_ratio"].fillna(0.5)
+    industry_frame["leader"] = industry_frame["leader"].fillna("")
+    industry_frame["leader_change_pct"] = industry_frame["leader_change_pct"].fillna(0.0)
+
+    zt_pool = ak.stock_zt_pool_em(date=market_date_compact)
+    previous_zt_pool = ak.stock_zt_pool_previous_em(date=market_date_compact)
+    strong_pool = ak.stock_zt_pool_strong_em(date=market_date_compact)
+    broken_pool = ak.stock_zt_pool_zbgc_em(date=market_date_compact)
+    limit_down_pool = ak.stock_zt_pool_dtgc_em(date=market_date_compact)
+
+    zt_counts = build_industry_pool_counts(zt_pool)
+    strong_counts = build_industry_pool_counts(strong_pool)
+    broken_counts = build_industry_pool_counts(broken_pool)
+
+    industry_frame["limit_up_count"] = industry_frame["name"].map(lambda name: zt_counts.get(normalize_sector_name(name), 0))
+    industry_frame["strong_pool_count"] = industry_frame["name"].map(lambda name: strong_counts.get(normalize_sector_name(name), 0))
+    industry_frame["broken_board_count"] = industry_frame["name"].map(lambda name: broken_counts.get(normalize_sector_name(name), 0))
+
+    strength_weights = {
+        "change_pct": 0.22,
+        "net_flow_100m": 0.18,
+        "breadth_ratio": 0.16,
+        "change_5d_pct": 0.14,
+        "change_20d_pct": 0.12,
+        "net_flow_5d_100m": 0.10,
+        "net_flow_20d_100m": 0.08,
+    }
+    industry_frame["strength_score"] = (
+        sum(series_rank_pct(industry_frame[column]) * weight for column, weight in strength_weights.items())
+        / sum(strength_weights.values())
+        * 100
+    ).round(1)
+    industry_frame["persistence_score"] = (
+        (
+            industry_frame["above_20dma"].astype(int) * 0.24
+            + industry_frame["above_50dma"].astype(int) * 0.24
+            + (industry_frame["positive_days_5"] / 5.0) * 0.18
+            + series_rank_pct(industry_frame["change_5d_pct"]) * 0.12
+            + series_rank_pct(industry_frame["change_20d_pct"]) * 0.12
+            + (industry_frame["net_flow_5d_100m"] > 0).astype(int) * 0.05
+            + (industry_frame["net_flow_20d_100m"] > 0).astype(int) * 0.05
+        )
+        * 100
+    ).round(1)
+    industry_frame["confirmation_score"] = (
+        (
+            series_rank_pct(industry_frame["limit_up_count"]) * 0.14
+            + series_rank_pct(industry_frame["strong_pool_count"]) * 0.16
+            + (1 - series_rank_pct(industry_frame["broken_board_count"])) * 0.14
+            + industry_frame["breadth_ratio"] * 0.18
+            + industry_frame["above_20dma"].astype(int) * 0.19
+            + industry_frame["above_50dma"].astype(int) * 0.19
+        )
+        * 100
+    ).round(1)
+    industry_frame["leadership_score"] = (
+        industry_frame["strength_score"] * 0.45
+        + industry_frame["persistence_score"] * 0.25
+        + industry_frame["confirmation_score"] * 0.30
+    ).round(1)
+
+    fake_flags = []
+    for _, row in industry_frame.iterrows():
+        flags = []
+        if row["change_pct"] > 0 and row["net_flow_100m"] <= 0:
+            flags.append("day-one pop without inflow")
+        if row["change_pct"] > 0 and row["breadth_ratio"] < 0.58:
+            flags.append("leader-only breadth")
+        if row["change_pct"] > 0 and row["change_20d_pct"] <= 0:
+            flags.append("still negative on the 20-day leg")
+        if row["leader_change_pct"] > max(8.0, row["change_pct"] * 2) and row["breadth_ratio"] < 0.65:
+            flags.append("single-stock squeeze")
+        if row["broken_board_count"] > max(1, row["strong_pool_count"]):
+            flags.append("broken-board pressure")
+        fake_flags.append(flags)
+    industry_frame["fake_flags"] = fake_flags
+    industry_frame["fake_score"] = (
+        series_rank_pct(industry_frame["change_pct"]) * 0.26
+        + series_rank_pct(industry_frame["leader_change_pct"]) * 0.14
+        + series_rank_pct(industry_frame["broken_board_count"]) * 0.20
+        + (1 - series_rank_pct(industry_frame["breadth_ratio"])) * 0.18
+        + (1 - series_rank_pct(industry_frame["net_flow_5d_100m"])) * 0.12
+        + (1 - series_rank_pct(industry_frame["change_20d_pct"])) * 0.10
+    ) * 100
+
+    concept_today = fetch_ths_fund_flow("concept", "today")
+    concept_5d = fetch_ths_fund_flow("concept", "5d")[["name", "period_change_pct", "net_flow_100m"]].rename(
+        columns={"period_change_pct": "change_5d_pct", "net_flow_100m": "net_flow_5d_100m"}
+    )
+    concept_20d = fetch_ths_fund_flow("concept", "20d")[["name", "period_change_pct", "net_flow_100m"]].rename(
+        columns={"period_change_pct": "change_20d_pct", "net_flow_100m": "net_flow_20d_100m"}
+    )
+    concept_frame = concept_today.merge(concept_5d, on="name", how="left").merge(concept_20d, on="name", how="left")
+    for column in ["change_pct", "net_flow_100m", "change_5d_pct", "net_flow_5d_100m", "change_20d_pct", "net_flow_20d_100m", "leader_change_pct"]:
+        concept_frame[column] = concept_frame[column].fillna(0.0)
+    concept_frame["heat_score"] = (
+        (
+            series_rank_pct(concept_frame["change_pct"]) * 0.22
+            + series_rank_pct(concept_frame["net_flow_100m"]) * 0.20
+            + series_rank_pct(concept_frame["change_5d_pct"]) * 0.18
+            + series_rank_pct(concept_frame["net_flow_5d_100m"]) * 0.16
+            + series_rank_pct(concept_frame["change_20d_pct"]) * 0.12
+            + series_rank_pct(concept_frame["net_flow_20d_100m"]) * 0.12
+        )
+        * 100
+    ).round(1)
+
+    industry_above_20_pct = round(industry_frame["above_20dma"].mean() * 100, 1)
+    industry_above_50_pct = round(industry_frame["above_50dma"].mean() * 100, 1)
+    advancers = int(market_activity.get("上涨", 0))
+    decliners = int(market_activity.get("下跌", 0))
+    real_limit_up = int(market_activity.get("真实涨停", market_activity.get("涨停", len(zt_pool))))
+    real_limit_down = int(market_activity.get("真实跌停", market_activity.get("跌停", len(limit_down_pool))))
+    ad_ratio = advancers / max(decliners, 1)
+    limit_spread = real_limit_up - real_limit_down
+
+    regime_score = round(
+        (
+            scale_unit_interval(turnover_ratio, 0.85, 1.25) * 0.24
+            + scale_unit_interval(northbound["net_flow_100m"], -120, 180) * 0.18
+            + scale_unit_interval(ad_ratio, 0.7, 3.0) * 0.24
+            + scale_unit_interval(limit_spread, -15, 90) * 0.16
+            + ((industry_above_20_pct / 100) * 0.45 + (industry_above_50_pct / 100) * 0.55) * 0.18
+        )
+        * 100,
+        1,
+    )
+    momentum_score = round(
+        (
+            scale_unit_interval(real_limit_up, 15, 120) * 0.26
+            + scale_unit_interval(len(strong_pool), 20, 120) * 0.18
+            + scale_unit_interval(
+                ((previous_zt_pool["涨跌幅"] > 0).sum() / len(previous_zt_pool) * 100) if len(previous_zt_pool) else 0,
+                35,
+                70,
+            )
+            * 0.26
+            + (1 - scale_unit_interval(len(broken_pool) / max(len(zt_pool) + len(broken_pool), 1), 0.18, 0.55)) * 0.18
+            + (1 - scale_unit_interval(real_limit_down, 5, 35)) * 0.12
+        )
+        * 100,
+        1,
+    )
+
+    if regime_score >= 72:
+        regime_label = "Expansion"
+    elif regime_score >= 58:
+        regime_label = "Constructive"
+    elif regime_score >= 45:
+        regime_label = "Mixed"
+    elif regime_score >= 32:
+        regime_label = "Defensive"
+    else:
+        regime_label = "Washout"
+
+    if momentum_score >= 70:
+        momentum_label = "Healthy"
+    elif momentum_score >= 52:
+        momentum_label = "Usable"
+    elif momentum_score >= 38:
+        momentum_label = "Choppy"
+    else:
+        momentum_label = "Fragile"
+
+    strong_new_high_pct = round((strong_pool["是否新高"].eq("是").sum() / len(strong_pool) * 100) if len(strong_pool) else 0, 1)
+    prev_limitup_positive_pct = round((previous_zt_pool["涨跌幅"] > 0).sum() / len(previous_zt_pool) * 100, 1) if len(previous_zt_pool) else 0.0
+    broken_board_ratio = round(len(broken_pool) / max(len(zt_pool) + len(broken_pool), 1) * 100, 1)
+    streak_two_plus = int(pd.to_numeric(zt_pool["连板数"], errors="coerce").fillna(0).ge(2).sum())
+    max_streak = int(pd.to_numeric(zt_pool["连板数"], errors="coerce").fillna(0).max()) if len(zt_pool) else 0
+
+    top_industries = industry_frame.sort_values(["leadership_score", "strength_score"], ascending=False).head(8)
+    weak_industries = industry_frame[industry_frame["change_pct"] > 0].sort_values(["fake_score", "strength_score"], ascending=[False, False]).head(4)
+    top_concepts = concept_frame.sort_values(["heat_score", "net_flow_100m"], ascending=False).head(8)
+
+    notes = [
+        "沪深成交额 uses Shanghai + Shenzhen stock turnover from exchange summaries, which keeps the 20-day comparison internally consistent.",
+        "20DMA / 50DMA participation is measured on industry boards, not all individual A-shares, to keep the build practical and still useful for swing breadth.",
+        "Northbound uses the current Eastmoney net-flow feed because recent net-buy fields are incomplete in the historical endpoint.",
+        "Industry and concept flow tables come from THS pages via AkShare's token workflow; the local parser avoids the stale wrapper column mapping.",
+    ]
+    regime_summary = build_regime_summary(turnover_ratio, northbound["net_flow_100m"], advancers, decliners, industry_above_50_pct)
+
+    return {
+        "built_at": built_at,
+        "market_date": market_date,
+        "notes": notes,
+        "regime": {
+            "label": regime_label,
+            "score": regime_score,
+            "summary": regime_summary,
+            "signals": [
+                {
+                    "label": "沪深成交额",
+                    "display": format_turnover_trillion(latest_turnover / 1000000000000),
+                    "detail": f"{turnover_ratio:.2f}x vs 20D avg",
+                    "tone": tone_from_signed(turnover_ratio - 1, 0.05, -0.05),
+                },
+                {
+                    "label": "北向净流",
+                    "display": format_money_100m(northbound["net_flow_100m"]),
+                    "detail": f"沪股通 {northbound['sh_index_change_pct']:+.2f}% | 深股通 {northbound['sz_index_change_pct']:+.2f}%",
+                    "tone": tone_from_signed(northbound["net_flow_100m"]),
+                },
+                {
+                    "label": "涨跌家数",
+                    "display": f"{advancers} / {decliners}",
+                    "detail": f"A/D {ad_ratio:.2f}x",
+                    "tone": tone_from_signed(advancers - decliners),
+                },
+                {
+                    "label": "涨停对跌停",
+                    "display": f"{real_limit_up} / {real_limit_down}",
+                    "detail": f"炸板 {len(broken_pool)} | 强势池 {len(strong_pool)}",
+                    "tone": tone_from_signed(limit_spread),
+                },
+                {
+                    "label": "行业站上均线",
+                    "display": f"{industry_above_20_pct:.0f}% / {industry_above_50_pct:.0f}%",
+                    "detail": "Above 20DMA / 50DMA",
+                    "tone": tone_from_score((industry_above_20_pct * 0.4 + industry_above_50_pct * 0.6), 62, 38),
+                },
+            ],
+        },
+        "sector_breadth": {
+            "summary": f"{industry_above_20_pct:.0f}% of industry boards are above the 20DMA and {industry_above_50_pct:.0f}% are above the 50DMA.",
+            "signals": [
+                {
+                    "label": "Industry Breadth",
+                    "display": f"{industry_above_20_pct:.0f}% / {industry_above_50_pct:.0f}%",
+                    "detail": "Above 20DMA / 50DMA",
+                    "tone": tone_from_score((industry_above_20_pct + industry_above_50_pct) / 2, 60, 40),
+                },
+                {
+                    "label": "Top Industry",
+                    "display": top_industries.iloc[0]["name"],
+                    "detail": f"Strength {top_industries.iloc[0]['strength_score']:.0f} | Persistence {top_industries.iloc[0]['persistence_score']:.0f}",
+                    "tone": "positive",
+                },
+                {
+                    "label": "Top Concept",
+                    "display": top_concepts.iloc[0]['name'],
+                    "detail": f"Heat {top_concepts.iloc[0]['heat_score']:.0f} | Flow {format_money_100m(top_concepts.iloc[0]['net_flow_100m'])}",
+                    "tone": "positive",
+                },
+            ],
+            "industries": [
+                {
+                    "name": row["name"],
+                    "change_pct": round(float(row["change_pct"]), 2),
+                    "change_5d_pct": round(float(row["change_5d_pct"]), 2),
+                    "change_20d_pct": round(float(row["change_20d_pct"]), 2),
+                    "net_flow_100m": round(float(row["net_flow_100m"]), 2),
+                    "up_count": int(row["up_count"]),
+                    "down_count": int(row["down_count"]),
+                    "persistence": describe_persistence(float(row["persistence_score"])),
+                    "leadership": describe_leadership(float(row["leadership_score"])),
+                    "strength_score": round(float(row["strength_score"]), 1),
+                    "limit_up_count": int(row["limit_up_count"]),
+                    "strong_pool_count": int(row["strong_pool_count"]),
+                    "broken_board_count": int(row["broken_board_count"]),
+                    "leader": row["leader"],
+                    "leader_change_pct": round(float(row["leader_change_pct"]), 2),
+                }
+                for _, row in top_industries.iterrows()
+            ],
+            "concepts": [
+                {
+                    "name": row["name"],
+                    "change_pct": round(float(row["change_pct"]), 2),
+                    "change_5d_pct": round(float(row["change_5d_pct"]), 2),
+                    "change_20d_pct": round(float(row["change_20d_pct"]), 2),
+                    "net_flow_100m": round(float(row["net_flow_100m"]), 2),
+                    "net_flow_5d_100m": round(float(row["net_flow_5d_100m"]), 2),
+                    "net_flow_20d_100m": round(float(row["net_flow_20d_100m"]), 2),
+                    "leader": row["leader"],
+                    "leader_change_pct": round(float(row["leader_change_pct"]), 2),
+                    "heat_score": round(float(row["heat_score"]), 1),
+                }
+                for _, row in top_concepts.iterrows()
+            ],
+        },
+        "momentum_health": {
+            "label": momentum_label,
+            "score": momentum_score,
+            "summary": f"Continuation is {momentum_label.lower()} with {prev_limitup_positive_pct:.0f}% of yesterday's limit-ups still positive and a {broken_board_ratio:.0f}% broken-board ratio.",
+            "signals": [
+                {
+                    "label": "真实涨停",
+                    "display": str(real_limit_up),
+                    "detail": f"连板 2+ {streak_two_plus} | 最高连板 {max_streak}",
+                    "tone": tone_from_score(real_limit_up, 80, 25),
+                },
+                {
+                    "label": "跌停 / 炸板",
+                    "display": f"{real_limit_down} / {len(broken_pool)}",
+                    "detail": f"炸板率 {broken_board_ratio:.1f}%",
+                    "tone": "negative" if broken_board_ratio >= 35 or real_limit_down >= 10 else "neutral",
+                },
+                {
+                    "label": "强势股池",
+                    "display": str(len(strong_pool)),
+                    "detail": f"{strong_new_high_pct:.0f}% making new highs",
+                    "tone": tone_from_score(strong_new_high_pct, 55, 25),
+                },
+                {
+                    "label": "昨日涨停延续",
+                    "display": f"{prev_limitup_positive_pct:.0f}%",
+                    "detail": f"{len(previous_zt_pool)} names in sample",
+                    "tone": tone_from_score(prev_limitup_positive_pct, 62, 42),
+                },
+            ],
+        },
+        "leadership_quality": {
+            "summary": "Best leadership needs breadth, inflow, persistence, and stock-pool confirmation. Fake leadership is usually a single-stock squeeze or a one-day pop without follow-through.",
+            "best": [
+                {
+                    "name": row["name"],
+                    "leadership": describe_leadership(float(row["leadership_score"])),
+                    "strength_score": round(float(row["strength_score"]), 1),
+                    "persistence_score": round(float(row["persistence_score"]), 1),
+                    "detail": f"Flow {format_money_100m(float(row['net_flow_100m']))} | breadth {int(row['up_count'])}/{int(row['down_count'])} | strong {int(row['strong_pool_count'])}",
+                }
+                for _, row in top_industries.head(4).iterrows()
+            ],
+            "fake": [
+                {
+                    "name": row["name"],
+                    "fake_score": round(float(row["fake_score"]), 1),
+                    "detail": describe_fake_risk(row["fake_flags"]),
+                }
+                for _, row in weak_industries.iterrows()
+            ],
+        },
+    }
+
+
 def build_column_ranges(groups: Dict[str, List[Dict[str, object]]]) -> Dict[str, Dict[str, List[float]]]:
     ranges = {}
     for group_name, rows in groups.items():
@@ -330,6 +1105,7 @@ def main() -> None:
         "default_symbol": universe["default_symbol"],
     }
     breadth = build_breadth(groups, universe["group_order"], built_at)
+    swing_breadth_path = out_dir / "breadth_swing.json"
 
     write_json(out_dir / "snapshot.json", snapshot)
     write_json(out_dir / "meta.json", meta)
@@ -338,6 +1114,18 @@ def main() -> None:
     print(f"Wrote {out_dir / 'snapshot.json'}")
     print(f"Wrote {out_dir / 'meta.json'}")
     print(f"Wrote {out_dir / 'breadth.json'}")
+
+    # The swing breadth dataset depends on several live third-party pages, so a failure here
+    # should disable only the optional panel and never block the core ETF snapshot files.
+    try:
+        benchmark_history = fetch_history("SSE", universe["default_symbol"], history_cache)
+        swing_breadth = build_swing_breadth(latest_market_date, built_at, benchmark_history)
+    except Exception as exc:
+        swing_breadth_path.unlink(missing_ok=True)
+        print(f"Warning: skipped {swing_breadth_path} because the optional swing breadth build failed: {exc}")
+    else:
+        write_json(swing_breadth_path, swing_breadth)
+        print(f"Wrote {swing_breadth_path}")
 
 
 if __name__ == "__main__":

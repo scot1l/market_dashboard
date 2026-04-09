@@ -66,8 +66,41 @@
         .chart-box { flex:none; display:flex; min-height:360px; height:clamp(360px, calc(100vh - 210px), 680px); overflow:hidden; }
         #tradingview-chart { width:100%; height:100%; min-height:0; }
         .hint { margin-top:10px; padding:0 4px 6px; font-size:12px; color:var(--muted); line-height:1.5; }
+        .breadth-panel { margin-top:14px; padding:16px 18px; }
+        .breadth-title { margin:6px 0 0; font-size:24px; line-height:1.1; }
+        .breadth-stack { display:grid; gap:12px; margin-top:14px; }
+        .breadth-section { background:rgba(8,17,31,.92); border:1px solid rgba(148,163,184,.14); border-radius:14px; padding:14px; }
+        .breadth-section-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:12px; }
+        .breadth-section-title { font-size:17px; font-weight:700; }
+        .breadth-section-sub { margin-top:4px; font-size:13px; line-height:1.5; color:var(--muted); }
+        .breadth-badge { padding:7px 10px; border-radius:999px; border:1px solid rgba(148,163,184,.18); background:rgba(15,23,42,.9); font-size:12px; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+        .breadth-badge.positive { color:var(--up); border-color:rgba(34,197,94,.32); }
+        .breadth-badge.negative { color:var(--down); border-color:rgba(239,68,68,.32); }
+        .breadth-signal-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+        .breadth-signal { background:linear-gradient(180deg,rgba(17,34,56,.96),rgba(8,17,31,.96)); border:1px solid rgba(148,163,184,.14); border-radius:12px; padding:12px; min-height:96px; }
+        .breadth-signal.positive { border-color:rgba(34,197,94,.25); }
+        .breadth-signal.negative { border-color:rgba(239,68,68,.25); }
+        .breadth-signal-label { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+        .breadth-signal-value { margin-top:10px; font-size:24px; font-weight:700; line-height:1; }
+        .breadth-signal-detail { margin-top:8px; font-size:12px; line-height:1.4; color:var(--muted); }
+        .breadth-layout { display:grid; gap:12px; grid-template-columns:1.45fr 1fr; margin-top:12px; }
+        .breadth-subpanel { background:rgba(6,12,24,.72); border:1px solid rgba(148,163,184,.1); border-radius:12px; padding:12px; }
+        .breadth-subtitle { margin:0 0 10px; font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+        .breadth-list { display:grid; gap:8px; }
+        .breadth-row { display:grid; grid-template-columns:minmax(0,1.6fr) repeat(4,auto); gap:10px; align-items:center; padding:10px 0; border-top:1px solid rgba(148,163,184,.08); }
+        .breadth-row:first-child { border-top:none; padding-top:0; }
+        .breadth-name { font-size:14px; font-weight:700; line-height:1.25; }
+        .breadth-meta { margin-top:4px; font-size:12px; line-height:1.45; color:var(--muted); }
+        .breadth-stat { min-width:64px; text-align:right; font-size:13px; font-weight:700; }
+        .breadth-stat.wide { min-width:88px; }
+        .breadth-chip { display:inline-flex; align-items:center; gap:6px; margin-top:6px; padding:4px 8px; border-radius:999px; border:1px solid rgba(148,163,184,.16); background:rgba(15,23,42,.72); color:var(--muted); font-size:11px; letter-spacing:.05em; text-transform:uppercase; }
+        .breadth-chip.positive { color:var(--up); border-color:rgba(34,197,94,.24); }
+        .breadth-chip.negative { color:var(--down); border-color:rgba(239,68,68,.24); }
+        .breadth-notes { margin:0; padding-left:18px; color:var(--muted); font-size:12px; line-height:1.55; }
+        .breadth-note { margin:0 0 6px; }
         @media (max-width:1280px) { .app { flex-direction:column; align-items:stretch; } .sidebar { width:100%; border-right:none; border-bottom:1px solid var(--line); } .chart-pane { position:static; top:auto; max-height:none; min-width:0; overflow:visible; } .chart-box { height:clamp(360px, 58vh, 620px); } .overview-grid, .group-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-        @media (max-width:760px) { .sidebar,.chart-pane { padding:12px; } .brand h1 { font-size:25px; } .overview-grid, .group-grid, .guide-grid { grid-template-columns:1fr; } .chart-box { min-height:320px; height:360px; } }
+        @media (max-width:1280px) { .breadth-signal-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .breadth-layout { grid-template-columns:1fr; } }
+        @media (max-width:760px) { .sidebar,.chart-pane { padding:12px; } .brand h1, .breadth-title { font-size:25px; } .overview-grid, .group-grid, .guide-grid, .breadth-signal-grid { grid-template-columns:1fr; } .breadth-row { grid-template-columns:1fr 1fr; } .chart-box { min-height:320px; height:360px; } }
     </style>
 </head>
 <body>
@@ -81,6 +114,79 @@
             <section class="panel overview">
                 <div class="overview-grid" id="macro-grid"></div>
                 <div class="group-grid" id="group-grid"></div>
+            </section>
+            <section class="panel breadth-panel" id="swing-breadth-panel" style="display:none;">
+                <div class="eyebrow">A-share Breadth</div>
+                <h2 class="breadth-title">Professional Swing Breadth</h2>
+                <p id="breadth-summary" class="muted">Loading swing-trading breadth...</p>
+                <div class="breadth-stack">
+                    <section class="breadth-section">
+                        <div class="breadth-section-head">
+                            <div>
+                                <div class="breadth-section-title">Regime</div>
+                                <div id="breadth-regime-copy" class="breadth-section-sub"></div>
+                            </div>
+                            <div id="breadth-regime-badge" class="breadth-badge">Waiting</div>
+                        </div>
+                        <div class="breadth-signal-grid" id="breadth-regime-signals"></div>
+                    </section>
+                    <section class="breadth-section">
+                        <div class="breadth-section-head">
+                            <div>
+                                <div class="breadth-section-title">Sector Breadth</div>
+                                <div id="breadth-sector-copy" class="breadth-section-sub"></div>
+                            </div>
+                        </div>
+                        <div class="breadth-signal-grid" id="breadth-sector-signals"></div>
+                        <div class="breadth-layout">
+                            <div class="breadth-subpanel">
+                                <h3 class="breadth-subtitle">Industry Leaders</h3>
+                                <div class="breadth-list" id="breadth-industry-list"></div>
+                            </div>
+                            <div class="breadth-subpanel">
+                                <h3 class="breadth-subtitle">Concept Flow</h3>
+                                <div class="breadth-list" id="breadth-concept-list"></div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="breadth-section">
+                        <div class="breadth-section-head">
+                            <div>
+                                <div class="breadth-section-title">Momentum Health</div>
+                                <div id="breadth-momentum-copy" class="breadth-section-sub"></div>
+                            </div>
+                            <div id="breadth-momentum-badge" class="breadth-badge">Waiting</div>
+                        </div>
+                        <div class="breadth-signal-grid" id="breadth-momentum-signals"></div>
+                    </section>
+                    <section class="breadth-section">
+                        <div class="breadth-section-head">
+                            <div>
+                                <div class="breadth-section-title">Leadership Quality</div>
+                                <div id="breadth-leadership-copy" class="breadth-section-sub"></div>
+                            </div>
+                        </div>
+                        <div class="breadth-layout">
+                            <div class="breadth-subpanel">
+                                <h3 class="breadth-subtitle">Best Leadership</h3>
+                                <div class="breadth-list" id="breadth-best-list"></div>
+                            </div>
+                            <div class="breadth-subpanel">
+                                <h3 class="breadth-subtitle">Weak Or Fake</h3>
+                                <div class="breadth-list" id="breadth-fake-list"></div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="breadth-section">
+                        <div class="breadth-section-head">
+                            <div>
+                                <div class="breadth-section-title">Breadth Notes</div>
+                                <div class="breadth-section-sub">Tradeoffs and signal definitions used in the generated breadth dataset.</div>
+                            </div>
+                        </div>
+                        <ul class="breadth-notes" id="breadth-notes"></ul>
+                    </section>
+                </div>
             </section>
             <section class="panel guide">
                 <details>
@@ -121,7 +227,7 @@
     <script src="https://s3.tradingview.com/tv.js"></script>
     <script>
     (() => {
-        let snapshot = null, breadth = null, meta = null, chartWidget = null, allRows = [], currentIndex = 0;
+        let snapshot = null, breadth = null, breadthSwing = null, meta = null, chartWidget = null, allRows = [], currentIndex = 0;
         const sortState = {};
 
         const safe = value => String(value || '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -130,6 +236,7 @@
         const signed = value => value == null ? 'N/A' : (value > 0 ? '+' : '') + Number(value).toFixed(2) + '%';
         const fixed = (value, digits) => value == null ? 'N/A' : Number(value).toFixed(digits);
         const groupSummary = name => (breadth.groups || []).find(item => item.group === name);
+        const toneClass = tone => tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : '';
 
         function width(value, min, max) {
             if (value == null || min === max) return 0;
@@ -146,6 +253,61 @@
 
         function card(label, value, metaText) {
             return '<div class="card"><div class="label">' + esc(label) + '</div><div class="value">' + esc(value) + '</div><div class="meta">' + esc(metaText) + '</div></div>';
+        }
+
+        function signedShort(value, digits = 1) {
+            if (value == null) return 'N/A';
+            return (value > 0 ? '+' : '') + Number(value).toFixed(digits) + '%';
+        }
+
+        function flowValue(value) {
+            if (value == null) return 'N/A';
+            const amount = Math.abs(Number(value));
+            const prefix = value > 0 ? '+' : value < 0 ? '-' : '';
+            return prefix + (amount >= 10000 ? (amount / 10000).toFixed(2) + '万亿' : amount.toFixed(0) + '亿');
+        }
+
+        function breadthSignalCard(item) {
+            return '<div class="breadth-signal ' + toneClass(item.tone) + '"><div class="breadth-signal-label">' + esc(item.label) + '</div><div class="breadth-signal-value">' + esc(item.display) + '</div><div class="breadth-signal-detail">' + esc(item.detail) + '</div></div>';
+        }
+
+        function renderIndustryRow(item) {
+            return '<div class="breadth-row"><div><div class="breadth-name">' + esc(item.name) + '</div><div class="breadth-meta">' + esc(item.leader) + ' ' + esc(signedShort(item.leader_change_pct, 1)) + '</div><div class="breadth-chip ' + toneClass(item.leadership === 'Institutional' || item.leadership === 'Credible' ? 'positive' : item.leadership === 'Speculative' ? 'negative' : 'neutral') + '">' + esc(item.persistence) + ' / ' + esc(item.leadership) + '</div></div><div class="breadth-stat ' + klass(item.change_pct) + '">' + esc(signedShort(item.change_pct, 1)) + '</div><div class="breadth-stat ' + klass(item.change_5d_pct) + '">' + esc(signedShort(item.change_5d_pct, 1)) + '</div><div class="breadth-stat wide">' + esc(flowValue(item.net_flow_100m)) + '</div><div class="breadth-stat wide">' + esc(item.up_count + '/' + item.down_count) + '</div></div>';
+        }
+
+        function renderConceptRow(item) {
+            return '<div class="breadth-row"><div><div class="breadth-name">' + esc(item.name) + '</div><div class="breadth-meta">' + esc(item.leader) + ' ' + esc(signedShort(item.leader_change_pct, 1)) + '</div><div class="breadth-chip positive">Heat ' + esc(String(Math.round(item.heat_score))) + '</div></div><div class="breadth-stat ' + klass(item.change_pct) + '">' + esc(signedShort(item.change_pct, 1)) + '</div><div class="breadth-stat ' + klass(item.change_5d_pct) + '">' + esc(signedShort(item.change_5d_pct, 1)) + '</div><div class="breadth-stat ' + klass(item.change_20d_pct) + '">' + esc(signedShort(item.change_20d_pct, 1)) + '</div><div class="breadth-stat wide">' + esc(flowValue(item.net_flow_100m)) + '</div></div>';
+        }
+
+        function renderLeadershipRow(item, negative) {
+            const scoreLabel = negative ? 'Fake ' + Math.round(item.fake_score) : 'Strength ' + Math.round(item.strength_score) + ' | Persistence ' + Math.round(item.persistence_score);
+            return '<div class="breadth-row"><div><div class="breadth-name">' + esc(item.name) + '</div><div class="breadth-meta">' + esc(item.detail) + '</div><div class="breadth-chip ' + (negative ? 'negative' : 'positive') + '">' + esc(negative ? scoreLabel : item.leadership) + '</div></div><div class="breadth-stat wide">' + esc(scoreLabel) + '</div><div class="breadth-stat"></div><div class="breadth-stat"></div><div class="breadth-stat"></div></div>';
+        }
+
+        function renderSwingBreadth() {
+            const panel = document.getElementById('swing-breadth-panel');
+            if (!breadthSwing || breadthSwing.market_date !== snapshot.market_date) { panel.style.display = 'none'; return; }
+            panel.style.display = 'block';
+            document.getElementById('breadth-summary').textContent = breadthSwing.regime.summary;
+            document.getElementById('breadth-regime-copy').textContent = breadthSwing.regime.summary;
+            document.getElementById('breadth-regime-badge').textContent = breadthSwing.regime.label + ' | ' + Math.round(breadthSwing.regime.score);
+            document.getElementById('breadth-regime-badge').className = 'breadth-badge ' + toneClass(breadthSwing.regime.score >= 60 ? 'positive' : breadthSwing.regime.score <= 40 ? 'negative' : 'neutral');
+            document.getElementById('breadth-regime-signals').innerHTML = breadthSwing.regime.signals.map(breadthSignalCard).join('');
+
+            document.getElementById('breadth-sector-copy').textContent = breadthSwing.sector_breadth.summary;
+            document.getElementById('breadth-sector-signals').innerHTML = breadthSwing.sector_breadth.signals.map(breadthSignalCard).join('');
+            document.getElementById('breadth-industry-list').innerHTML = breadthSwing.sector_breadth.industries.map(renderIndustryRow).join('');
+            document.getElementById('breadth-concept-list').innerHTML = breadthSwing.sector_breadth.concepts.map(renderConceptRow).join('');
+
+            document.getElementById('breadth-momentum-copy').textContent = breadthSwing.momentum_health.summary;
+            document.getElementById('breadth-momentum-badge').textContent = breadthSwing.momentum_health.label + ' | ' + Math.round(breadthSwing.momentum_health.score);
+            document.getElementById('breadth-momentum-badge').className = 'breadth-badge ' + toneClass(breadthSwing.momentum_health.score >= 60 ? 'positive' : breadthSwing.momentum_health.score <= 40 ? 'negative' : 'neutral');
+            document.getElementById('breadth-momentum-signals').innerHTML = breadthSwing.momentum_health.signals.map(breadthSignalCard).join('');
+
+            document.getElementById('breadth-leadership-copy').textContent = breadthSwing.leadership_quality.summary;
+            document.getElementById('breadth-best-list').innerHTML = breadthSwing.leadership_quality.best.map(item => renderLeadershipRow(item, false)).join('');
+            document.getElementById('breadth-fake-list').innerHTML = breadthSwing.leadership_quality.fake.map(item => renderLeadershipRow(item, true)).join('');
+            document.getElementById('breadth-notes').innerHTML = breadthSwing.notes.map(item => '<li class="breadth-note">' + esc(item) + '</li>').join('');
         }
 
         function renderOverview() {
@@ -273,14 +435,16 @@
         Promise.all([
             fetchFreshJson('data/snapshot.json'),
             fetchFreshJson('data/breadth.json'),
-            fetchFreshJson('data/meta.json')
+            fetchFreshJson('data/meta.json'),
+            fetchFreshJson('data/breadth_swing.json')
         ]).then(results => {
-            snapshot = results[0]; breadth = results[1]; meta = results[2];
+            snapshot = results[0]; breadth = results[1]; meta = results[2]; breadthSwing = results[3];
             if (!snapshot || !breadth || !meta) {
                 document.getElementById('groups-container').innerHTML = '<section class="panel brand">Run <code>python scripts/build_data.py --out-dir data</code> to build the China ETF snapshot.</section>';
                 return;
             }
             renderOverview();
+            renderSwingBreadth();
             renderGroups();
             attachEvents();
             selectRow(allRows.find(row => row.dataset.code === meta.default_symbol) || allRows[0]);
