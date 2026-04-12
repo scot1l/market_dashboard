@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>China ETF Rotation Dashboard</title>
     <style>
-        :root { --bg:#04101d; --panel:#0a1727; --panel2:#102238; --line:rgba(148,163,184,.18); --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --up:#22c55e; --down:#ef4444; }
+        :root { --bg:#04101d; --panel:#0a1727; --panel2:#102238; --line:rgba(148,163,184,.18); --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --up:#22c55e; --down:#ef4444; --setup:#34d399; }
         * { box-sizing:border-box; }
         html, body { margin:0; min-height:100%; background:radial-gradient(circle at top,#0b1b30 0%,var(--bg) 55%); color:var(--text); }
         body { font-family:"IBM Plex Sans","Segoe UI",sans-serif; }
@@ -37,7 +37,7 @@
         .group-title { font-size:18px; font-weight:700; }
         .group-stats { font-size:12px; color:var(--muted); white-space:nowrap; }
         .table-wrap { overflow-x:auto; }
-        .ticker-table { width:100%; min-width:1110px; border-collapse:collapse; }
+        .ticker-table { width:100%; min-width:1190px; border-collapse:collapse; }
         .ticker-table th, .ticker-table td { padding:12px 10px; border-bottom:1px solid rgba(148,163,184,.08); vertical-align:middle; }
         .ticker-table th { position:sticky; top:0; z-index:1; background:rgba(8,17,31,.98); text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); cursor:pointer; }
         .ticker-table th.sort-asc::after { content:" ^"; }
@@ -57,15 +57,24 @@
         .metric-bar.pos { left:0; background:var(--up); } .metric-bar.neg { right:0; background:var(--down); }
         .metric-text { position:relative; z-index:1; }
         .up { color:var(--up); font-weight:700; } .down { color:var(--down); font-weight:700; }
+        .setup-badge { display:inline-flex; align-items:center; padding:5px 9px; border-radius:999px; border:1px solid rgba(52,211,153,.3); background:rgba(52,211,153,.12); color:#6ee7b7; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
         .rs-chart { display:block; width:96px; height:30px; object-fit:contain; border-radius:8px; background:rgba(15,23,42,.9); }
         .chart-title { margin:0; font-size:28px; line-height:1.05; }
         .chart-sub { margin-top:8px; font-size:14px; color:var(--muted); line-height:1.45; }
         .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
         .chip { padding:6px 10px; border-radius:999px; border:1px solid rgba(148,163,184,.18); background:rgba(8,17,31,.88); color:var(--muted); font-size:12px; }
+        .chip.good-setup { border-color:rgba(52,211,153,.28); background:rgba(52,211,153,.1); color:#6ee7b7; }
         .chart-header { flex:0 0 auto; }
         .chart-box { flex:none; display:flex; min-height:360px; height:clamp(360px, calc(100vh - 210px), 680px); overflow:hidden; }
         #tradingview-chart { width:100%; height:100%; min-height:0; }
+        .chart-empty { display:flex; align-items:center; justify-content:center; width:100%; padding:24px; text-align:center; color:var(--muted); font-size:14px; line-height:1.6; }
         .hint { margin-top:10px; padding:0 4px 6px; font-size:12px; color:var(--muted); line-height:1.5; }
+        .setup-toolbar, .empty-panel { margin-top:14px; padding:14px 16px; }
+        .setup-toolbar { display:flex; justify-content:space-between; gap:14px; align-items:center; }
+        .setup-toolbar-copy { min-width:0; }
+        .setup-toolbar-copy p { margin:6px 0 0; }
+        .setup-toggle { display:inline-flex; align-items:center; gap:10px; padding:9px 12px; border-radius:999px; border:1px solid rgba(148,163,184,.18); background:rgba(8,17,31,.88); color:var(--text); font-size:13px; cursor:pointer; white-space:nowrap; user-select:none; }
+        .setup-toggle input { margin:0; width:15px; height:15px; accent-color:var(--setup); }
         .breadth-panel { margin-top:14px; padding:16px 18px; }
         .breadth-title { margin:6px 0 0; font-size:24px; line-height:1.1; }
         .breadth-stack { display:grid; gap:12px; margin-top:14px; }
@@ -106,7 +115,7 @@
         .breadth-note { margin:0 0 6px; }
         @media (max-width:1280px) { .app { flex-direction:column; align-items:stretch; } .sidebar { width:100%; border-right:none; border-bottom:1px solid var(--line); } .chart-pane { position:static; top:auto; max-height:none; min-width:0; overflow:visible; } .chart-box { height:clamp(360px, 58vh, 620px); } .overview-grid, .group-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
         @media (max-width:1280px) { .breadth-signal-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .breadth-layout { grid-template-columns:1fr; } }
-        @media (max-width:760px) { .sidebar,.chart-pane { padding:12px; } .brand h1, .breadth-title { font-size:25px; } .overview-grid, .group-grid, .guide-grid, .breadth-signal-grid { grid-template-columns:1fr; } .breadth-row, .breadth-row.compact, .breadth-row.dual { grid-template-columns:1fr 1fr; } .breadth-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); justify-content:stretch; } .chart-box { min-height:320px; height:360px; } }
+        @media (max-width:760px) { .sidebar,.chart-pane { padding:12px; } .brand h1, .breadth-title { font-size:25px; } .overview-grid, .group-grid, .guide-grid, .breadth-signal-grid { grid-template-columns:1fr; } .setup-toolbar { flex-direction:column; align-items:flex-start; } .breadth-row, .breadth-row.compact, .breadth-row.dual { grid-template-columns:1fr 1fr; } .breadth-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); justify-content:stretch; } .chart-box { min-height:320px; height:360px; } }
     </style>
 </head>
 <body>
@@ -200,6 +209,7 @@
                     <div class="guide-grid">
                         <div class="guide-section">Column Meaning</div>
                         <div class="guide-item"><strong>Grade</strong><span class="muted">Trend structure from EMA10, EMA20, and SMA50.</span><span class="muted">A = clean uptrend, B = transition or mixed structure, C = clean downtrend.</span></div>
+                        <div class="guide-item"><strong>Setup</strong><span class="muted">Automatic constructive scan from Grade, RS21, Group%, AmtZ, and ATRx50.</span><span class="muted">A good setup is either a clean leader or an early rotation candidate that is not yet too stretched.</span></div>
                         <div class="guide-item"><strong>1D / 5D / 20D</strong><span class="muted">Raw return windows.</span><span class="muted">1D shows the latest push, 5D shows short swing momentum, 20D shows the monthly leg.</span></div>
                         <div class="guide-item"><strong>ATR%</strong><span class="muted">14-session ATR as a percent of price.</span><span class="muted">Higher means more movement and more risk per position unit.</span></div>
                         <div class="guide-item"><strong>ATRx50</strong><span class="muted">Distance from the 50-session average in ATR units.</span><span class="muted">0 to +2 is constructive, above +3 is often extended, below 0 means below medium-term trend.</span></div>
@@ -217,6 +227,20 @@
                     </div>
                 </details>
             </section>
+            <section class="panel setup-toolbar">
+                <div class="setup-toolbar-copy">
+                    <div class="eyebrow">Setup Scan</div>
+                    <p id="setup-toolbar-meta" class="muted">Loading setup marks...</p>
+                </div>
+                <label class="setup-toggle" for="good-setup-filter">
+                    <input id="good-setup-filter" type="checkbox">
+                    <span>Only good setups</span>
+                </label>
+            </section>
+            <section class="panel empty-panel" id="groups-empty-state" hidden>
+                <div class="eyebrow">No Matches</div>
+                <p class="muted">No ETFs currently match the good-setup rules for this snapshot. Turn off the filter to review the full board.</p>
+            </section>
             <div id="groups-container"></div>
             <div class="hint">Arrow up/down moves through the rows. Click any header to sort. This dashboard is designed for after-close ETF rotation, not intraday execution.</div>
         </aside>
@@ -233,8 +257,9 @@
     <script src="https://s3.tradingview.com/tv.js"></script>
     <script>
     (() => {
-        let snapshot = null, breadth = null, breadthSwing = null, meta = null, chartWidget = null, allRows = [], currentIndex = 0;
+        let snapshot = null, breadth = null, breadthSwing = null, meta = null, chartWidget = null, allRows = [], currentIndex = 0, selectedCode = null;
         const sortState = {};
+        const filterState = { onlyGoodSetup: false };
 
         const safe = value => String(value || '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
         const esc = value => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -259,6 +284,29 @@
 
         function card(label, value, metaText) {
             return '<div class="card"><div class="label">' + esc(label) + '</div><div class="value">' + esc(value) + '</div><div class="meta">' + esc(metaText) + '</div></div>';
+        }
+
+        function visibleRows() {
+            return Array.from(document.querySelectorAll('.ticker-row')).filter(row => {
+                const group = row.closest('.group');
+                return row.style.display !== 'none' && (!group || group.style.display !== 'none');
+            });
+        }
+
+        function renderSetupToolbar() {
+            const total = Object.values(snapshot.groups || {}).reduce((sum, rows) => sum + rows.length, 0);
+            const marked = Object.values(snapshot.groups || {}).reduce((sum, rows) => sum + rows.filter(row => row.good_setup).length, 0);
+            const suffix = filterState.onlyGoodSetup ? ' Showing marked ETFs only.' : '';
+            document.getElementById('setup-toolbar-meta').textContent =
+                marked + ' of ' + total + ' ETFs currently qualify as good setups.' + suffix;
+        }
+
+        function setChartEmptyState(title, detail) {
+            if (chartWidget) { chartWidget.remove(); chartWidget = null; }
+            document.getElementById('chart-title').textContent = title;
+            document.getElementById('chart-sub').textContent = detail;
+            document.getElementById('chart-chips').innerHTML = '';
+            document.getElementById('tradingview-chart').innerHTML = '<div class="chart-empty">' + esc(detail) + '</div>';
         }
 
         function signedShort(value, digits = 1) {
@@ -336,8 +384,9 @@
         }
 
         function rowHtml(row, index, color, ranges) {
-            return '<tr class="ticker-row" data-index="' + index + '" data-group="' + esc(row.group) + '" data-code="' + esc(row.code) + '" data-label="' + esc(row.label) + '" data-name="' + esc(row.name) + '" data-grade="' + esc(row.grade) + '" data-benchmark-name="' + esc(row.benchmark_name) + '" data-chart-symbol="' + esc(row.chart_symbol) + '" data-benchmark-chart-symbol="' + esc(row.benchmark_chart_symbol) + '" data-daily="' + row.daily + '" data-metric5d="' + row['5d'] + '" data-metric20d="' + row['20d'] + '" data-atrpct="' + row.atr_pct + '" data-atrx50="' + row.atrx50 + '" data-rs21d="' + row.rs_21d + '" data-grouprank20d="' + row.group_rank_20d + '" data-amount20davg="' + row.amount_20d_avg + '" data-amountz20d="' + row.amount_z_20d + '">' +
+            return '<tr class="ticker-row" data-index="' + index + '" data-group="' + esc(row.group) + '" data-code="' + esc(row.code) + '" data-label="' + esc(row.label) + '" data-name="' + esc(row.name) + '" data-grade="' + esc(row.grade) + '" data-goodsetup="' + (row.good_setup ? '1' : '0') + '" data-goodsetupreason="' + esc(row.good_setup_reason || '') + '" data-benchmark-name="' + esc(row.benchmark_name) + '" data-chart-symbol="' + esc(row.chart_symbol) + '" data-benchmark-chart-symbol="' + esc(row.benchmark_chart_symbol) + '" data-daily="' + row.daily + '" data-metric5d="' + row['5d'] + '" data-metric20d="' + row['20d'] + '" data-atrpct="' + row.atr_pct + '" data-atrx50="' + row.atrx50 + '" data-rs21d="' + row.rs_21d + '" data-grouprank20d="' + row.group_rank_20d + '" data-amount20davg="' + row.amount_20d_avg + '" data-amountz20d="' + row.amount_z_20d + '">' +
                 '<td><div class="ticker-main"><span class="ticker-pill" style="background:' + color + '">' + esc(row.code) + '</span><div class="ticker-copy"><div class="ticker-label">' + esc(row.label) + '</div><div class="ticker-name">' + esc(row.name) + '</div></div></div></td>' +
+                '<td>' + (row.good_setup ? '<span class="setup-badge">Good setup</span>' : '<span class="muted">-</span>') + '</td>' +
                 '<td>' + (row.grade ? '<span class="rating ' + row.grade.toLowerCase() + '">' + row.grade + '</span>' : '<span class="muted">-</span>') + '</td>' +
                 '<td>' + metric(row.daily, ranges.daily[0], ranges.daily[1]) + '</td>' +
                 '<td>' + metric(row['5d'], ranges['5d'][0], ranges['5d'][1]) + '</td>' +
@@ -358,13 +407,14 @@
                 const summary = groupSummary(groupName);
                 const color = meta.group_colors[groupName] || '#475569';
                 const ranges = snapshot.column_ranges[groupName];
-                return '<section class="group" id="group-' + safe(groupName) + '"><div class="group-header"><div class="group-title">' + esc(groupName) + '</div><div class="group-stats">Avg5D ' + signed(summary.avg_5d) + ' | AvgRS ' + summary.avg_rs_21d + ' | >EMA20 ' + summary.above_ema20 + '/' + summary.count + ' | >SMA50 ' + summary.above_sma50 + '/' + summary.count + '</div></div><div class="table-wrap"><table class="ticker-table" data-group="' + esc(groupName) + '"><thead><tr><th class="sortable" data-sort-by="code">ETF</th><th class="sortable" data-sort-by="grade">Grade</th><th class="sortable" data-sort-by="daily">1D</th><th class="sortable" data-sort-by="metric5d">5D</th><th class="sortable" data-sort-by="metric20d">20D</th><th class="sortable" data-sort-by="atrpct">ATR%</th><th class="sortable" data-sort-by="atrx50">ATRx50</th><th class="sortable" data-sort-by="rs21d">RS21</th><th class="sortable" data-sort-by="grouprank20d">Group%</th><th class="sortable" data-sort-by="amount20davg">Amt20</th><th class="sortable" data-sort-by="amountz20d">AmtZ</th><th>RS</th></tr></thead><tbody>' + rows.map((row, idx) => rowHtml(row, idx, color, ranges)).join('') + '</tbody></table></div></section>';
+                return '<section class="group" id="group-' + safe(groupName) + '"><div class="group-header"><div class="group-title">' + esc(groupName) + '</div><div class="group-stats">Avg5D ' + signed(summary.avg_5d) + ' | AvgRS ' + summary.avg_rs_21d + ' | >EMA20 ' + summary.above_ema20 + '/' + summary.count + ' | >SMA50 ' + summary.above_sma50 + '/' + summary.count + '</div></div><div class="table-wrap"><table class="ticker-table" data-group="' + esc(groupName) + '"><thead><tr><th class="sortable" data-sort-by="code">ETF</th><th class="sortable" data-sort-by="goodsetup">Setup</th><th class="sortable" data-sort-by="grade">Grade</th><th class="sortable" data-sort-by="daily">1D</th><th class="sortable" data-sort-by="metric5d">5D</th><th class="sortable" data-sort-by="metric20d">20D</th><th class="sortable" data-sort-by="atrpct">ATR%</th><th class="sortable" data-sort-by="atrx50">ATRx50</th><th class="sortable" data-sort-by="rs21d">RS21</th><th class="sortable" data-sort-by="grouprank20d">Group%</th><th class="sortable" data-sort-by="amount20davg">Amt20</th><th class="sortable" data-sort-by="amountz20d">AmtZ</th><th>RS</th></tr></thead><tbody>' + rows.map((row, idx) => rowHtml(row, idx, color, ranges)).join('') + '</tbody></table></div></section>';
             }).join('');
             document.getElementById('groups-container').innerHTML = html;
-            allRows = Array.from(document.querySelectorAll('.ticker-row'));
+            allRows = visibleRows();
         }
 
         function initChart(row) {
+            document.getElementById('tradingview-chart').innerHTML = '';
             if (chartWidget) { chartWidget.remove(); chartWidget = null; }
             const compareSymbols = row.dataset.benchmarkChartSymbol !== row.dataset.chartSymbol ? [{ symbol: row.dataset.benchmarkChartSymbol }] : [];
             chartWidget = new TradingView.widget({
@@ -377,20 +427,60 @@
         }
 
         function selectRow(row) {
-            allRows.forEach(item => item.classList.remove('active'));
+            if (!row) return;
+            Array.from(document.querySelectorAll('.ticker-row.active')).forEach(item => item.classList.remove('active'));
             row.classList.add('active');
+            selectedCode = row.dataset.code;
+            allRows = visibleRows();
             currentIndex = allRows.indexOf(row);
             document.getElementById('chart-title').textContent = row.dataset.label + ' (' + row.dataset.code + ')';
-            document.getElementById('chart-sub').textContent = row.dataset.name + ' | Benchmark ' + row.dataset.benchmarkName + ' | Market date ' + snapshot.market_date;
-            document.getElementById('chart-chips').innerHTML = [
+            document.getElementById('chart-sub').textContent =
+                row.dataset.name + ' | Benchmark ' + row.dataset.benchmarkName + ' | Market date ' + snapshot.market_date +
+                (row.dataset.goodsetup === '1' && row.dataset.goodsetupreason ? ' | Setup ' + row.dataset.goodsetupreason : '');
+            const chips = [
                 '<div class="chip">Grade ' + esc(row.dataset.grade) + '</div>',
                 '<div class="chip">RS21 ' + Math.round(Number(row.dataset.rs21d)) + '%</div>',
                 '<div class="chip">Group ' + Math.round(Number(row.dataset.grouprank20d)) + '%</div>',
                 '<div class="chip">ATRx50 ' + fixed(row.dataset.atrx50, 2) + '</div>',
                 '<div class="chip">AmtZ ' + fixed(row.dataset.amountz20d, 2) + '</div>'
-            ].join('');
+            ];
+            if (row.dataset.goodsetup === '1') {
+                chips.unshift('<div class="chip">' + esc(row.dataset.goodsetupreason || 'Good setup') + '</div>');
+                chips.unshift('<div class="chip good-setup">Good setup</div>');
+            }
+            document.getElementById('chart-chips').innerHTML = chips.join('');
             initChart(row);
             row.scrollIntoView({ behavior:'smooth', block:'nearest' });
+        }
+
+        function applySetupFilter() {
+            Array.from(document.querySelectorAll('.group')).forEach(group => {
+                let visibleCount = 0;
+                Array.from(group.querySelectorAll('.ticker-row')).forEach(row => {
+                    const show = !filterState.onlyGoodSetup || row.dataset.goodsetup === '1';
+                    row.style.display = show ? '' : 'none';
+                    if (show) visibleCount += 1;
+                });
+                group.style.display = visibleCount ? '' : 'none';
+            });
+
+            allRows = visibleRows();
+            renderSetupToolbar();
+
+            const emptyState = document.getElementById('groups-empty-state');
+            if (filterState.onlyGoodSetup && !allRows.length) {
+                emptyState.hidden = false;
+                Array.from(document.querySelectorAll('.ticker-row.active')).forEach(item => item.classList.remove('active'));
+                currentIndex = 0;
+                setChartEmptyState('No Good Setups', 'No ETFs currently match the good-setup filter for ' + snapshot.market_date + '.');
+                return;
+            }
+
+            emptyState.hidden = true;
+            const preferred = allRows.find(row => row.dataset.code === selectedCode) || allRows[0];
+            if (preferred) {
+                selectRow(preferred);
+            }
         }
 
         function sortGroup(groupName, sortBy) {
@@ -398,8 +488,6 @@
             if (!table) return;
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('.ticker-row'));
-            const active = document.querySelector('.ticker-row.active');
-            const activeCode = active ? active.dataset.code : null;
             const state = sortState[groupName] || { sortBy:null, direction:1, count:0 };
             sortState[groupName] = state;
             table.querySelectorAll('th').forEach(th => th.classList.remove('sort-asc', 'sort-desc'));
@@ -408,8 +496,7 @@
                 if (state.count >= 3) {
                     state.sortBy = null; state.direction = 1; state.count = 0;
                     rows.sort((a, b) => Number(a.dataset.index) - Number(b.dataset.index));
-                    tbody.innerHTML = ''; rows.forEach(row => tbody.appendChild(row)); allRows = Array.from(document.querySelectorAll('.ticker-row'));
-                    if (activeCode) { const selected = allRows.find(row => row.dataset.code === activeCode); if (selected) selectRow(selected); }
+                    tbody.innerHTML = ''; rows.forEach(row => tbody.appendChild(row)); applySetupFilter();
                     return;
                 }
                 state.direction *= -1;
@@ -420,9 +507,9 @@
                 if (sortBy === 'code' || sortBy === 'grade') return a.dataset[sortBy].localeCompare(b.dataset[sortBy]) * state.direction;
                 return (Number(a.dataset[sortBy]) - Number(b.dataset[sortBy])) * state.direction;
             });
-            tbody.innerHTML = ''; rows.forEach(row => tbody.appendChild(row)); allRows = Array.from(document.querySelectorAll('.ticker-row'));
+            tbody.innerHTML = ''; rows.forEach(row => tbody.appendChild(row));
             const header = table.querySelector('th[data-sort-by="' + sortBy + '"]'); if (header) header.classList.add(state.direction === 1 ? 'sort-asc' : 'sort-desc');
-            if (activeCode) { const selected = allRows.find(row => row.dataset.code === activeCode); if (selected) selectRow(selected); }
+            applySetupFilter();
         }
 
         function attachEvents() {
@@ -431,6 +518,10 @@
                 if (row) { selectRow(row); return; }
                 const header = event.target.closest('th.sortable');
                 if (header) { sortGroup(header.closest('.ticker-table').dataset.group, header.dataset.sortBy); }
+            });
+            document.getElementById('good-setup-filter').addEventListener('change', event => {
+                filterState.onlyGoodSetup = event.target.checked;
+                applySetupFilter();
             });
             document.addEventListener('keydown', event => {
                 if (!allRows.length) return;
@@ -455,6 +546,7 @@
             }
             renderOverview();
             renderSwingBreadth();
+            renderSetupToolbar();
             renderGroups();
             attachEvents();
             selectRow(allRows.find(row => row.dataset.code === meta.default_symbol) || allRows[0]);

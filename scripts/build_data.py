@@ -203,6 +203,8 @@ def build_row(
         "above_ema20": bool(close.iloc[-1] > ema20),
         "above_sma50": bool(close.iloc[-1] > sma50),
         "rs_chart": create_rs_chart(rs_frame, item["code"], charts_dir),
+        "good_setup": False,
+        "good_setup_reason": None,
     }
 
 
@@ -217,6 +219,33 @@ def assign_group_ranks(rows: List[Dict[str, object]]) -> None:
     ranks = values.rank(method="average")
     for index, row in enumerate(rows):
         row["group_rank_20d"] = round(((ranks.iloc[index] - 1) / (len(rows) - 1)) * 100, 0)
+
+
+def assign_good_setups(rows: List[Dict[str, object]]) -> None:
+    for row in rows:
+        trend_setup = (
+            row["grade"] == "A"
+            and row["rs_21d"] >= 80
+            and row["group_rank_20d"] >= 70
+            and row["amount_z_20d"] > 0
+            and 0 <= row["atrx50"] <= 2
+        )
+        early_rotation = (
+            row["grade"] == "B"
+            and row["above_ema20"]
+            and 60 <= row["rs_21d"] <= 80
+            and row["group_rank_20d"] >= 60
+            and row["amount_z_20d"] >= 1
+            and -1 <= row["atrx50"] <= 1
+        )
+
+        row["good_setup"] = bool(trend_setup or early_rotation)
+        if trend_setup:
+            row["good_setup_reason"] = "Trend setup"
+        elif early_rotation:
+            row["good_setup_reason"] = "Early rotation"
+        else:
+            row["good_setup_reason"] = None
 
 
 def build_breadth(groups: Dict[str, List[Dict[str, object]]], group_order: List[str], built_at: str) -> Dict[str, object]:
@@ -622,7 +651,12 @@ def describe_fake_risk(flags: List[str]) -> str:
 
 def build_regime_summary(turnover_ratio: float, northbound_flow: float, advancers: int, decliners: int, above_50_pct: float) -> str:
     phrases = []
-    phrases.append("turnover is expanding" if turnover_ratio >= 1.05 else "turnover is below its 20-day baseline")
+    if turnover_ratio >= 1.05:
+        phrases.append("turnover is expanding")
+    elif turnover_ratio <= 0.95:
+        phrases.append("turnover is below its 20-day baseline")
+    else:
+        phrases.append("turnover is roughly in line with its 20-day baseline")
     phrases.append("northbound is supportive" if northbound_flow > 0 else "northbound is not confirming")
     phrases.append("breadth is broad" if advancers > decliners * 2 else "breadth is mixed")
     phrases.append("medium-term participation is healthy" if above_50_pct >= 55 else "medium-term participation is still selective")
@@ -1088,6 +1122,7 @@ def main() -> None:
     latest_market_date = max(row["market_date"] for rows in groups.values() for row in rows)
     for group_name in universe["group_order"]:
         assign_group_ranks(groups[group_name])
+        assign_good_setups(groups[group_name])
         groups[group_name].sort(key=lambda row: (row["rs_21d"], row["5d"]), reverse=True)
 
     built_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")

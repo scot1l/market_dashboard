@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-04-09T13:55:06.235013Z",
+  "built_at": "2026-04-09T17:39:34.313856Z",
   "market_date": "2026-04-09",
   "notes": [
     "沪深成交额 uses Shanghai + Shenzhen stock turnover from exchange summaries, which keeps the 20-day comparison internally consistent.",
@@ -10,7 +10,7 @@
   "regime": {
     "label": "Washout",
     "score": 31.3,
-    "summary": "turnover is below its 20-day baseline, northbound is not confirming, breadth is mixed, medium-term participation is still selective.",
+    "summary": "turnover is roughly in line with its 20-day baseline, northbound is not confirming, breadth is mixed, medium-term participation is still selective.",
     "signals": [
       {
         "label": "沪深成交额",

@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-04-09T13:55:06.235013Z",
+  "built_at": "2026-04-09T17:39:34.313856Z",
   "market_date": "2026-04-09",
   "groups": {
     "Broad": [
@@ -26,6 +26,8 @@
         "above_ema20": true,
         "above_sma50": false,
         "rs_chart": "data/charts/510300.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 67.0
       },
       {
@@ -51,6 +53,8 @@
         "above_ema20": true,
         "above_sma50": true,
         "rs_chart": "data/charts/159915.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 100.0
       },
       {
@@ -76,6 +80,8 @@
         "above_ema20": true,
         "above_sma50": false,
         "rs_chart": "data/charts/588000.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 33.0
       },
       {
@@ -101,6 +107,8 @@
         "above_ema20": true,
         "above_sma50": false,
         "rs_chart": "data/charts/510500.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 0.0
       }
     ],
@@ -128,6 +136,8 @@
         "above_ema20": true,
         "above_sma50": true,
         "rs_chart": "data/charts/159819.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 100.0
       },
       {
@@ -153,6 +163,8 @@
         "above_ema20": true,
         "above_sma50": false,
         "rs_chart": "data/charts/516510.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 25.0
       },
       {
@@ -178,6 +190,8 @@
         "above_ema20": true,
         "above_sma50": false,
         "rs_chart": "data/charts/515030.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 50.0
       },
       {
@@ -203,6 +217,8 @@
         "above_ema20": false,
         "above_sma50": false,
         "rs_chart": "data/charts/515790.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 0.0
       },
       {
@@ -228,6 +244,8 @@
         "above_ema20": true,
         "above_sma50": false,
         "rs_chart": "data/charts/512480.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 75.0
       }
     ],
@@ -255,6 +273,8 @@
         "above_ema20": false,
         "above_sma50": true,
         "rs_chart": "data/charts/512800.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 100.0
       },
       {
@@ -280,6 +300,8 @@
         "above_ema20": false,
         "above_sma50": false,
         "rs_chart": "data/charts/512660.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 0.0
       },
       {
@@ -305,6 +327,8 @@
         "above_ema20": false,
         "above_sma50": false,
         "rs_chart": "data/charts/516970.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 67.0
       },
       {
@@ -330,6 +354,8 @@
         "above_ema20": false,
         "above_sma50": false,
         "rs_chart": "data/charts/512880.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 33.0
       }
     ],
@@ -357,6 +383,8 @@
         "above_ema20": false,
         "above_sma50": false,
         "rs_chart": "data/charts/159928.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 0.0
       },
       {
@@ -382,6 +410,8 @@
         "above_ema20": false,
         "above_sma50": false,
         "rs_chart": "data/charts/512690.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 50.0
       },
       {
@@ -407,6 +437,8 @@
         "above_ema20": true,
         "above_sma50": false,
         "rs_chart": "data/charts/512170.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 100.0
       }
     ],
@@ -434,6 +466,8 @@
         "above_ema20": false,
         "above_sma50": false,
         "rs_chart": "data/charts/518880.png",
+        "good_setup": false,
+        "good_setup_reason": null,
         "group_rank_20d": 50.0
       }
     ]
