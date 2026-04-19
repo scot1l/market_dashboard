@@ -57,11 +57,10 @@ The **Refresh dashboard data** workflow keeps the generated JSON and chart files
 updated. When it completes successfully, the Pages deployment workflow publishes
 the refreshed static site.
 
-The refresh job polls every 30 minutes from 15:00 through 18:30
-Asia/Shanghai, Monday through Friday. Each run rebuilds `data/`, commits only
-when the generated files changed, and then lets the Pages workflow publish the
-latest snapshot. For an immediate refresh, run **Refresh dashboard data** from
-the GitHub Actions tab.
+The refresh job polls at 15:30, 16:30, 17:30, and 18:30 Asia/Shanghai, Monday
+through Friday. Each run rebuilds `data/`, commits only when the generated files
+changed, and then lets the Pages workflow publish the latest snapshot. For an
+immediate refresh, run **Refresh dashboard data** from the GitHub Actions tab.
 
 ## Generated files
 
