@@ -21,6 +21,98 @@ import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "config" / "china_etf_universe.json"
+THS_LEVEL1_BY_LEVEL2 = {
+    "半导体": "电子",
+    "元件": "电子",
+    "消费电子": "电子",
+    "其他电子": "电子",
+    "光学光电子": "电子",
+    "电子化学品": "电子",
+    "通信设备": "通信",
+    "通信服务": "通信",
+    "计算机设备": "计算机",
+    "软件开发": "计算机",
+    "IT服务": "计算机",
+    "电池": "电力设备",
+    "风电设备": "电力设备",
+    "光伏设备": "电力设备",
+    "电网设备": "电力设备",
+    "其他电源设备": "电力设备",
+    "电机": "电力设备",
+    "汽车整车": "汽车",
+    "汽车零部件": "汽车",
+    "汽车服务及其他": "汽车",
+    "通用设备": "机械设备",
+    "专用设备": "机械设备",
+    "自动化设备": "机械设备",
+    "工程机械": "机械设备",
+    "轨交设备": "机械设备",
+    "军工电子": "国防军工",
+    "军工装备": "国防军工",
+    "化学原料": "基础化工",
+    "化学制品": "基础化工",
+    "化学纤维": "基础化工",
+    "塑料制品": "基础化工",
+    "橡胶制品": "基础化工",
+    "农化制品": "基础化工",
+    "非金属材料": "基础化工",
+    "金属新材料": "有色金属",
+    "工业金属": "有色金属",
+    "能源金属": "有色金属",
+    "小金属": "有色金属",
+    "贵金属": "有色金属",
+    "钢铁": "黑色金属",
+    "煤炭开采加工": "煤炭",
+    "石油加工贸易": "石油石化",
+    "油气开采及服务": "石油石化",
+    "电力": "公用事业",
+    "燃气": "公用事业",
+    "环保设备": "环保",
+    "环境治理": "环保",
+    "白色家电": "家用电器",
+    "黑色家电": "家用电器",
+    "小家电": "家用电器",
+    "厨卫电器": "家用电器",
+    "食品加工制造": "食品饮料",
+    "饮料制造": "食品饮料",
+    "白酒": "食品饮料",
+    "纺织制造": "纺织服装",
+    "服装家纺": "纺织服装",
+    "包装印刷": "轻工制造",
+    "造纸": "轻工制造",
+    "家居用品": "轻工制造",
+    "建筑材料": "建筑材料",
+    "建筑装饰": "建筑装饰",
+    "房地产": "房地产",
+    "银行": "银行",
+    "证券": "非银金融",
+    "保险": "非银金融",
+    "多元金融": "非银金融",
+    "医疗器械": "医药生物",
+    "生物制品": "医药生物",
+    "化学制药": "医药生物",
+    "中药": "医药生物",
+    "医药商业": "医药生物",
+    "医疗服务": "医药生物",
+    "美容护理": "美容护理",
+    "零售": "商贸零售",
+    "互联网电商": "商贸零售",
+    "贸易": "商贸零售",
+    "农产品加工": "农林牧渔",
+    "种植业与林业": "农林牧渔",
+    "养殖业": "农林牧渔",
+    "港口航运": "交通运输",
+    "机场航运": "交通运输",
+    "公路铁路运输": "交通运输",
+    "物流": "交通运输",
+    "文化传媒": "传媒",
+    "影视院线": "传媒",
+    "游戏": "传媒",
+    "教育": "社会服务",
+    "旅游及酒店": "社会服务",
+    "其他社会服务": "社会服务",
+    "综合": "综合",
+}
 
 
 def load_universe() -> Dict[str, object]:
@@ -649,6 +741,93 @@ def describe_fake_risk(flags: List[str]) -> str:
     return "; ".join(flags[:3]) if flags else "Narrow leadership"
 
 
+def ths_watch_status(score: float, *, extended: bool = False, weak: bool = False) -> str:
+    if weak:
+        return "Avoid"
+    if score >= 72:
+        return "Watch on pullback" if extended else "Watch"
+    if score >= 56:
+        return "Wait"
+    return "Avoid"
+
+
+def build_ths_industry_watchlist(industry_frame: pd.DataFrame) -> Dict[str, object]:
+    watch_frame = industry_frame.copy()
+    watch_frame["level1"] = watch_frame["name"].map(THS_LEVEL1_BY_LEVEL2).fillna("未分组")
+    watch_frame["watch_score"] = (
+        watch_frame["strength_score"] * 0.42
+        + watch_frame["persistence_score"] * 0.26
+        + watch_frame["confirmation_score"] * 0.32
+    ).round(1)
+    watch_frame["extended"] = (watch_frame["change_5d_pct"] >= 8.0) | (watch_frame["amount_ratio_20d"] >= 1.8)
+    watch_frame["weak"] = (~watch_frame["above_20dma"].astype(bool)) & (watch_frame["change_5d_pct"] <= 0)
+
+    level2 = []
+    for _, row in watch_frame.sort_values(["watch_score", "strength_score"], ascending=False).head(12).iterrows():
+        level2.append(
+            {
+                "name": row["name"],
+                "level1": row["level1"],
+                "status": ths_watch_status(float(row["watch_score"]), extended=bool(row["extended"]), weak=bool(row["weak"])),
+                "score": round(float(row["watch_score"]), 1),
+                "change_pct": round(float(row["change_pct"]), 2),
+                "change_5d_pct": round(float(row["change_5d_pct"]), 2),
+                "change_20d_pct": round(float(row["change_20d_pct"]), 2),
+                "net_flow_100m": round(float(row["net_flow_100m"]), 2),
+                "breadth_pct": round(float(row["breadth_ratio"]) * 100, 1),
+                "above_20dma": bool(row["above_20dma"]),
+                "above_50dma": bool(row["above_50dma"]),
+                "amount_ratio_20d": round(float(row["amount_ratio_20d"]), 2),
+                "leader": row["leader"],
+                "leader_change_pct": round(float(row["leader_change_pct"]), 2),
+                "company_count": int(row["company_count"]),
+            }
+        )
+
+    level1_rows = []
+    for level1_name, group in watch_frame.groupby("level1", sort=False):
+        leaders = group.sort_values("watch_score", ascending=False).head(3)
+        up_count = int(group["up_count"].sum())
+        down_count = int(group["down_count"].sum())
+        breadth_pct = up_count / max(up_count + down_count, 1) * 100
+        score = (
+            float(group["watch_score"].mean()) * 0.55
+            + float(leaders["watch_score"].mean()) * 0.25
+            + breadth_pct * 0.20
+        )
+        level1_rows.append(
+            {
+                "name": level1_name,
+                "status": ths_watch_status(score, extended=bool((leaders["extended"]).mean() >= 0.67)),
+                "score": round(score, 1),
+                "change_pct": round(float(group["change_pct"].mean()), 2),
+                "change_5d_pct": round(float(group["change_5d_pct"].mean()), 2),
+                "net_flow_100m": round(float(group["net_flow_100m"].sum()), 2),
+                "breadth_pct": round(breadth_pct, 1),
+                "child_count": int(len(group)),
+                "leaders": [
+                    {
+                        "name": child["name"],
+                        "score": round(float(child["watch_score"]), 1),
+                        "status": ths_watch_status(
+                            float(child["watch_score"]),
+                            extended=bool(child["extended"]),
+                            weak=bool(child["weak"]),
+                        ),
+                    }
+                    for _, child in leaders.iterrows()
+                ],
+            }
+        )
+
+    level1 = sorted(level1_rows, key=lambda item: item["score"], reverse=True)[:8]
+    return {
+        "summary": "THS level-1 industries are aggregated from the public THS industry-board list; level-2 entries are the strongest THS industry boards by strength, persistence, and confirmation.",
+        "level1": level1,
+        "level2": level2,
+    }
+
+
 def build_regime_summary(turnover_ratio: float, northbound_flow: float, advancers: int, decliners: int, above_50_pct: float) -> str:
     phrases = []
     if turnover_ratio >= 1.05:
@@ -911,6 +1090,7 @@ def build_swing_breadth(
     top_industries = industry_frame.sort_values(["leadership_score", "strength_score"], ascending=False).head(8)
     weak_industries = industry_frame[industry_frame["change_pct"] > 0].sort_values(["fake_score", "strength_score"], ascending=[False, False]).head(4)
     top_concepts = concept_frame.sort_values(["heat_score", "net_flow_100m"], ascending=False).head(8)
+    industry_watchlist = build_ths_industry_watchlist(industry_frame)
 
     notes = [
         "沪深成交额 uses Shanghai + Shenzhen stock turnover from exchange summaries, which keeps the 20-day comparison internally consistent.",
@@ -1019,6 +1199,7 @@ def build_swing_breadth(
                 for _, row in top_concepts.iterrows()
             ],
         },
+        "industry_watchlist": industry_watchlist,
         "momentum_health": {
             "label": momentum_label,
             "score": momentum_score,

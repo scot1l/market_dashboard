@@ -42,6 +42,8 @@
         .theme-status.caution { color:#fbbf24; border-color:rgba(251,191,36,.32); }
         .theme-meta, .theme-leaders { margin-top:7px; font-size:12px; line-height:1.45; color:var(--muted); }
         .theme-item.disabled { border-left-color:var(--down); opacity:.82; }
+        .industry-watch-head { display:flex; justify-content:space-between; gap:10px; align-items:end; margin-top:16px; padding-top:14px; border-top:1px solid rgba(148,163,184,.12); }
+        .industry-watch-sub { font-size:12px; color:var(--muted); white-space:nowrap; }
         .card { background:rgba(8,17,31,.92); border:1px solid rgba(148,163,184,.14); border-radius:14px; padding:12px; }
         .card .label { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
         .card .value { font-size:24px; font-weight:700; }
@@ -164,6 +166,11 @@
                     <div class="theme-focus">
                         <div class="eyebrow">Theme Focus</div>
                         <div class="theme-list" id="theme-focus-list"></div>
+                        <div class="industry-watch-head">
+                            <div class="eyebrow">THS Industry Watch</div>
+                            <div class="industry-watch-sub">Level 1 / Level 2</div>
+                        </div>
+                        <div class="theme-list" id="industry-watch-list"></div>
                     </div>
                 </div>
             </section>
@@ -493,6 +500,8 @@
             if (!freshness.fresh) {
                 document.getElementById('theme-focus-list').innerHTML =
                     '<div class="theme-item disabled"><div class="theme-rank">!</div><div><div class="theme-head"><div class="theme-name">Refresh first</div><div class="theme-status negative">Stale</div></div><div class="theme-meta">Market date ' + esc(freshness.marketDate) + ' | Expected ' + esc(freshness.expected) + '</div><div class="theme-leaders">Do not choose next-day themes from stale data.</div></div></div>';
+                document.getElementById('industry-watch-list').innerHTML =
+                    '<div class="theme-item disabled"><div class="theme-rank">!</div><div><div class="theme-head"><div class="theme-name">Refresh first</div><div class="theme-status negative">Stale</div></div><div class="theme-meta">THS industry watch is gated by the same market date.</div><div class="theme-leaders">Refresh data before ranking level-1 or level-2 industries.</div></div></div>';
                 return;
             }
             document.getElementById('theme-focus-list').innerHTML = rankThemeFocus().slice(0, 3).map((item, index) => {
@@ -502,6 +511,28 @@
                 const warning = item.health.concentrationRisk ? ' Concentrated leader: peer confirmation is thin.' : '';
                 return '<div class="theme-item" style="--theme-color:' + esc(item.color) + '"><div class="theme-rank">' + (index + 1) + '</div><div><div class="theme-head"><div class="theme-name">' + esc(row.label) + '</div><div class="theme-status ' + item.tone + '">' + esc(item.status) + '</div></div><div class="theme-meta">' + esc(row.code) + ' | ' + esc(row.group) + ' | RS21 ' + esc(Math.round(row.rs_21d)) + ' | Group ' + esc(Math.round(row.group_rank_20d)) + '% | ATRx50 ' + esc(fixed(row.atrx50, 2)) + '</div><div class="theme-leaders">' + esc(item.note) + ' ' + esc(peerText) + '.' + esc(warning) + '</div></div></div>';
             }).join('');
+            renderIndustryWatchList();
+        }
+
+        function statusTone(status) {
+            return status === 'Watch' ? 'positive' : status === 'Avoid' ? 'negative' : status === 'Watch on pullback' ? 'caution' : '';
+        }
+
+        function renderIndustryWatchList() {
+            const watch = breadthSwing && breadthSwing.market_date === snapshot.market_date ? breadthSwing.industry_watchlist : null;
+            if (!watch) {
+                document.getElementById('industry-watch-list').innerHTML =
+                    '<div class="theme-item disabled"><div class="theme-rank">THS</div><div><div class="theme-head"><div class="theme-name">Waiting for industry data</div><div class="theme-status">Optional</div></div><div class="theme-meta">The optional THS breadth build has not produced level-1/level-2 data for this snapshot.</div><div class="theme-leaders">Run the refresh workflow after close; the panel appears when THS pages are available.</div></div></div>';
+                return;
+            }
+            const level1Cards = (watch.level1 || []).slice(0, 2).map((item, index) => {
+                const leaders = (item.leaders || []).map(child => child.name).join(', ');
+                return '<div class="theme-item" style="--theme-color:#38bdf8"><div class="theme-rank">L1</div><div><div class="theme-head"><div class="theme-name">' + esc(item.name) + '</div><div class="theme-status ' + statusTone(item.status) + '">' + esc(item.status) + '</div></div><div class="theme-meta">Score ' + esc(Math.round(item.score)) + ' | 5D ' + esc(signedShort(item.change_5d_pct, 1)) + ' | Breadth ' + esc(Math.round(item.breadth_pct)) + '% | Flow ' + esc(flowValue(item.net_flow_100m)) + '</div><div class="theme-leaders">Level-2 leaders: ' + esc(leaders || 'None') + '.</div></div></div>';
+            });
+            const level2Cards = (watch.level2 || []).slice(0, 3).map((item, index) =>
+                '<div class="theme-item" style="--theme-color:#34d399"><div class="theme-rank">L2</div><div><div class="theme-head"><div class="theme-name">' + esc(item.name) + '</div><div class="theme-status ' + statusTone(item.status) + '">' + esc(item.status) + '</div></div><div class="theme-meta">' + esc(item.level1) + ' | Score ' + esc(Math.round(item.score)) + ' | 5D ' + esc(signedShort(item.change_5d_pct, 1)) + ' | Breadth ' + esc(Math.round(item.breadth_pct)) + '%</div><div class="theme-leaders">Leader: ' + esc(item.leader || 'None') + ' ' + esc(signedShort(item.leader_change_pct, 1)) + ' | Flow ' + esc(flowValue(item.net_flow_100m)) + '.</div></div></div>'
+            );
+            document.getElementById('industry-watch-list').innerHTML = level1Cards.concat(level2Cards).join('');
         }
 
         function visibleRows() {
