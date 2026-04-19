@@ -1,14 +1,18 @@
-# Refresh dashboard data daily and commit so GitHub Pages serves updated JSON/charts.
+# Refresh dashboard data and commit changed JSON/charts for GitHub Pages.
 name: Refresh dashboard data
 
 on:
   schedule:
-    # Run Mon–Fri at 16:30 US Eastern (20:30 UTC); skip weekends
-    - cron: '30 20 * * 1-5'
+    # GitHub cron is UTC. Poll every 30 minutes from 15:00-18:30 Asia/Shanghai on weekdays.
+    - cron: '*/30 7-10 * * 1-5'
   workflow_dispatch: # Allow manual run
 
 permissions:
   contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -33,7 +37,7 @@ jobs:
         run: |
           python scripts/build_data.py --out-dir data
         env:
-          TZ: UTC
+          TZ: Asia/Shanghai
 
       - name: Commit and push data
         run: |
