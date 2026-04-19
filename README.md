@@ -2,6 +2,8 @@
 
 Static A-share ETF dashboard for after-close regime reading and sector rotation.
 
+Live dashboard: https://scot1l.github.io/market_dashboard/
+
 The project now tracks a curated set of China-listed ETFs across:
 
 - Broad market
