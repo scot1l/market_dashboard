@@ -44,6 +44,16 @@
         .theme-item.disabled { border-left-color:var(--down); opacity:.82; }
         .industry-watch-head { display:flex; justify-content:space-between; gap:10px; align-items:end; margin-top:16px; padding-top:14px; border-top:1px solid rgba(148,163,184,.12); }
         .industry-watch-sub { font-size:12px; color:var(--muted); white-space:nowrap; }
+        .decision-help { margin-top:14px; padding-top:12px; border-top:1px solid rgba(148,163,184,.12); }
+        .decision-help summary { display:flex; justify-content:space-between; align-items:center; cursor:pointer; color:var(--accent); font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; list-style:none; }
+        .decision-help summary::-webkit-details-marker { display:none; }
+        .decision-help summary::after { content:"+"; width:20px; height:20px; border:1px solid rgba(91,141,239,.36); border-radius:6px; display:inline-grid; place-items:center; letter-spacing:0; }
+        .decision-help[open] summary::after { content:"-"; }
+        .decision-help-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px; }
+        .decision-help-item { padding:10px 12px; border:1px solid rgba(148,163,184,.12); border-radius:8px; background:rgba(8,17,31,.72); }
+        .decision-help-item.full { grid-column:1/-1; }
+        .decision-help-item strong { display:block; margin-bottom:5px; font-size:13px; }
+        .decision-help-item span { display:block; color:var(--muted); font-size:12px; line-height:1.5; }
         .card { background:rgba(8,17,31,.92); border:1px solid rgba(148,163,184,.14); border-radius:14px; padding:12px; }
         .card .label { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
         .card .value { font-size:24px; font-weight:700; }
@@ -139,7 +149,7 @@
         .breadth-note { margin:0 0 6px; }
         @media (max-width:1280px) { .app { flex-direction:column; align-items:stretch; } .sidebar { width:100%; border-right:none; border-bottom:1px solid var(--line); } .chart-pane { position:static; top:auto; max-height:none; min-width:0; overflow:visible; } .chart-box { height:clamp(360px, 58vh, 620px); } .decision-grid { grid-template-columns:1fr; } .overview-grid, .group-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
         @media (max-width:1280px) { .breadth-signal-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .breadth-layout { grid-template-columns:1fr; } }
-        @media (max-width:760px) { .sidebar,.chart-pane { padding:12px; } .brand h1, .breadth-title { font-size:25px; } .overview-grid, .group-grid, .guide-grid, .breadth-signal-grid { grid-template-columns:1fr; } .setup-toolbar { flex-direction:column; align-items:flex-start; } .breadth-row, .breadth-row.compact, .breadth-row.dual { grid-template-columns:1fr 1fr; } .breadth-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); justify-content:stretch; } .chart-box { min-height:320px; height:360px; } }
+        @media (max-width:760px) { .sidebar,.chart-pane { padding:12px; } .brand h1, .breadth-title { font-size:25px; } .overview-grid, .group-grid, .guide-grid, .breadth-signal-grid, .decision-help-grid { grid-template-columns:1fr; } .setup-toolbar { flex-direction:column; align-items:flex-start; } .breadth-row, .breadth-row.compact, .breadth-row.dual { grid-template-columns:1fr 1fr; } .breadth-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); justify-content:stretch; } .chart-box { min-height:320px; height:360px; } }
     </style>
 </head>
 <body>
@@ -173,6 +183,22 @@
                         <div class="theme-list" id="industry-watch-list"></div>
                     </div>
                 </div>
+                <details class="decision-help">
+                    <summary>指标说明</summary>
+                    <div class="decision-help-grid">
+                        <div class="decision-help-item"><strong>Tomorrow Bias</strong><span>Tradeable = 分数不低于 72；Selective = 48 到 71；Stand Aside = 低于 48。若交易日落后于预期，直接显示 No Decision，不看分数。</span></div>
+                        <div class="decision-help-item"><strong>Bias Score</strong><span>分数来自全市场 EMA20/MA50 广度、宽基 ETF 趋势、可观察主题数量、Good setup 数量。没有主题或个股设置确认时，最高压到 45。</span></div>
+                        <div class="decision-help-item"><strong>Theme Focus 状态</strong><span>Watch = ETF 主题强度、趋势和同组确认同时较好。Watch on pullback = 方向强但短线偏伸展。Wait = 有线索但确认不足。Avoid = 次日不优先看。</span></div>
+                        <div class="decision-help-item"><strong>Theme Focus 数字</strong><span>RS21 是相对基准的 21 日相对强弱百分位。Group% 是同组内 20 日表现排名。ATRx50 是偏离 50 日均线的 ATR 倍数。Peer 是同组健康度确认。</span></div>
+                        <div class="decision-help-item"><strong>THS L1 / L2</strong><span>L1 是由同花顺二级行业聚合出的一级行业。L2 是同花顺行业板块本身。THS Score 综合强度、持续性和确认度，来自趋势、宽度、资金流、涨停池和近期涨幅。</span></div>
+                        <div class="decision-help-item"><strong>THS 状态</strong><span>Watch = Score 不低于 72 且不弱。Watch on pullback = Score 不低于 72 但 5 日涨幅或量能偏伸展。Wait = 56 到 71。Avoid = 低于 56 或跌破 20 日线且 5 日偏弱。</span></div>
+                        <div class="decision-help-item"><strong>Overview / Group</strong><span>Tone 看宽基 ETF 参与度。Strongest / Weakest 按平均 RS21 排名。Breadth 显示 ETF 站上 EMA20 / SMA50 的比例。组卡片的 Avg5D、AvgRS、>EMA20、>SMA50 用来判断同组是否共振。</span></div>
+                        <div class="decision-help-item"><strong>Regime / Momentum</strong><span>Regime 分数综合成交额、北向、涨跌家数、涨停跌停差和行业均线参与度。Expansion >=72，Constructive >=58，Mixed >=45，Defensive >=32，低于 32 为 Washout。Momentum 看涨停池、强势池、昨日涨停反馈、炸板率和跌停数。</span></div>
+                        <div class="decision-help-item"><strong>Leadership / Heat</strong><span>Strength 衡量行业短中期涨幅、资金和宽度排名。Persistence 看是否站上 20/50 日线、5 日阳线数量和多日资金。Fake 是上涨但资金、宽度、20 日趋势或炸板压力不配合。Heat 是概念的涨幅和资金综合热度。</span></div>
+                        <div class="decision-help-item"><strong>表格 / 图表</strong><span>Grade、Setup、1D/5D/20D、ATR%、ATRx50、RS21、Group%、Amt20、AmtZ、RS Chart 的详细定义在下方 Column Guide，可按需展开。右侧图表芯片复用同一套口径。</span></div>
+                        <div class="decision-help-item full"><strong>使用方式</strong><span>先用 Tomorrow Bias 判断明天是否值得交易，再用 Theme Focus 和 THS Industry Watch 选观察方向；这些信号用于缩小观察范围，不等于直接追买信号。</span></div>
+                    </div>
+                </details>
             </section>
             <section class="panel overview">
                 <div class="overview-grid" id="macro-grid"></div>
