@@ -39,7 +39,9 @@
         .theme-status { flex:0 0 auto; padding:5px 8px; border-radius:8px; border:1px solid rgba(148,163,184,.18); color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
         .theme-status.positive { color:var(--up); border-color:rgba(34,197,94,.3); }
         .theme-status.negative { color:var(--down); border-color:rgba(239,68,68,.32); }
+        .theme-status.caution { color:#fbbf24; border-color:rgba(251,191,36,.32); }
         .theme-meta, .theme-leaders { margin-top:7px; font-size:12px; line-height:1.45; color:var(--muted); }
+        .theme-item.disabled { border-left-color:var(--down); opacity:.82; }
         .card { background:rgba(8,17,31,.92); border:1px solid rgba(148,163,184,.14); border-radius:14px; padding:12px; }
         .card .label { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
         .card .value { font-size:24px; font-weight:700; }
@@ -387,28 +389,43 @@
             return clamp(Number(row.rs_21d) * .35 + Number(row.group_rank_20d) * .25 + trend + amount - extensionPenalty);
         }
 
-        function rankThemeGroups() {
-            return (meta.group_order || []).filter(groupName => groupName !== 'Broad').map(groupName => {
-                const summary = groupSummary(groupName) || {};
-                const rows = snapshot.groups[groupName] || [];
-                const count = summary.count || rows.length;
-                const trendScore = percent(summary.above_ema20, count) * .55 + percent(summary.above_sma50, count) * .45;
-                const rankedRows = rows.slice().sort((a, b) => rowLeadershipScore(b) - rowLeadershipScore(a));
-                const bestScore = rankedRows.length ? rowLeadershipScore(rankedRows[0]) : 0;
-                const avgExtension = average(rankedRows.slice(0, 2).map(row => row.atrx50));
-                const setupScore = percent(rows.filter(row => row.good_setup).length, Math.max(1, count));
-                const score = clamp(Number(summary.avg_rs_21d || 0) * .3 + trendScore * .25 + momentumScore(summary.avg_5d) * .25 + bestScore * .15 + setupScore * .05);
-                const extended = avgExtension != null && avgExtension > 2.8;
-                const status = score >= 60 ? (extended ? 'Watch on pullback' : 'Watch') : score >= 44 ? 'Wait' : 'Avoid';
-                const tone = status === 'Watch' ? 'positive' : status === 'Avoid' ? 'negative' : '';
-                return {
-                    group: groupName, score, status, tone, summary, rows: rankedRows,
-                    color: (meta.group_colors || {})[groupName] || '#475569',
-                    note: status === 'Watch' ? 'Leadership and participation are clean enough for next-day focus.'
-                        : status === 'Watch on pullback' ? 'Leadership is visible, but short-term extension argues against chasing.'
-                        : status === 'Wait' ? 'Mixed theme. Watch for breadth or volume confirmation.'
-                        : 'Weak participation. Not a priority for tomorrow.'
-                };
+        function groupHealth(groupName) {
+            const summary = groupSummary(groupName) || {};
+            const rows = snapshot.groups[groupName] || [];
+            const count = summary.count || rows.length;
+            const trendScore = percent(summary.above_ema20, count) * .55 + percent(summary.above_sma50, count) * .45;
+            const setupScore = percent(rows.filter(row => row.good_setup).length, Math.max(1, count));
+            const score = clamp(Number(summary.avg_rs_21d || 0) * .35 + trendScore * .35 + momentumScore(summary.avg_5d) * .2 + setupScore * .1);
+            const rankedScores = rows.map(rowLeadershipScore).sort((a, b) => b - a);
+            const runnerUpScore = average(rankedScores.slice(1, 3)) || 0;
+            return {
+                group: groupName,
+                score,
+                summary,
+                participation: percent(summary.above_ema20, count),
+                concentrationRisk: rankedScores[0] - runnerUpScore > 28 && score < 50
+            };
+        }
+
+        function rankThemeFocus() {
+            return allSnapshotRows().filter(row => row.group !== 'Broad').map(row => {
+                const health = groupHealth(row.group);
+                const leadership = rowLeadershipScore(row);
+                const extended = Number(row.atrx50) > 2.8;
+                const weakStructure = row.grade === 'C' && Number(row.atrx50) < 0;
+                const score = clamp(leadership * .65 + health.score * .35 + (row.good_setup ? 8 : 0) - (health.concentrationRisk ? 8 : 0));
+                let status = 'Avoid';
+                if (score >= 62 && health.score >= 45 && !weakStructure) {
+                    status = extended ? 'Watch on pullback' : 'Watch';
+                } else if (score >= 40 || health.score >= 48) {
+                    status = 'Wait';
+                }
+                const tone = status === 'Watch' ? 'positive' : status === 'Avoid' ? 'negative' : status === 'Watch on pullback' ? 'caution' : '';
+                const note = status === 'Watch' ? 'Clean enough for next-day focus: trend, relative strength, and peer confirmation line up.'
+                    : status === 'Watch on pullback' ? 'Leadership is visible, but the theme is extended. Wait for a cleaner entry area.'
+                    : status === 'Wait' ? 'Interesting, but confirmation is incomplete. Let breadth or volume improve first.'
+                    : 'Not a priority for tomorrow unless the structure changes.';
+                return { row, score, status, tone, note, health, extended, weakStructure, color: (meta.group_colors || {})[row.group] || '#475569' };
             }).sort((a, b) => b.score - a.score);
         }
 
@@ -429,12 +446,12 @@
             const overview = breadth.overview || {};
             const rows = allSnapshotRows();
             const broad = groupSummary('Broad') || {};
-            const themes = rankThemeGroups();
+            const themes = rankThemeFocus();
             const aboveEma20 = Number(overview.above_ema20_pct || 0);
             const aboveSma50 = Number(overview.above_sma50_pct || 0);
             const broadTrend = (percent(broad.above_ema20, broad.count) + percent(broad.above_sma50, broad.count)) / 2;
             const watchThemes = themes.filter(item => item.status === 'Watch' || item.status === 'Watch on pullback').length;
-            const goodSetups = rows.filter(row => row.good_setup).length;
+            const goodSetups = rows.filter(row => row.group !== 'Broad' && row.good_setup).length;
             const rawScore = clamp(
                 (aboveEma20 >= 70 ? 25 : aboveEma20 >= 55 ? 16 : aboveEma20 >= 40 ? 8 : 0) +
                 (aboveSma50 >= 55 ? 20 : aboveSma50 >= 40 ? 12 : aboveSma50 >= 25 ? 6 : 0) +
@@ -466,15 +483,24 @@
         }
 
         function renderDecisionPanel() {
+            const freshness = freshnessState();
             const bias = tomorrowBias();
             document.getElementById('tomorrow-bias').textContent = bias.label;
             document.getElementById('tomorrow-bias-badge').textContent = bias.badge;
             document.getElementById('tomorrow-bias-badge').className = 'decision-badge ' + bias.tone;
             document.getElementById('tomorrow-bias-score').textContent = bias.detail;
             document.getElementById('tomorrow-bias-reasons').innerHTML = bias.reasons.map(reason => '<li>' + esc(reason) + '</li>').join('');
-            document.getElementById('theme-focus-list').innerHTML = rankThemeGroups().slice(0, 3).map((item, index) => {
-                const leaders = item.rows.slice(0, 2).map(row => row.code + ' ' + row.label).join(', ') || 'No clear leader';
-                return '<div class="theme-item" style="--theme-color:' + esc(item.color) + '"><div class="theme-rank">' + (index + 1) + '</div><div><div class="theme-head"><div class="theme-name">' + esc(item.group) + '</div><div class="theme-status ' + item.tone + '">' + esc(item.status) + '</div></div><div class="theme-meta">RS ' + esc(Math.round(item.summary.avg_rs_21d || 0)) + ' | 5D ' + esc(signed(item.summary.avg_5d)) + ' | >EMA20 ' + esc((item.summary.above_ema20 || 0) + '/' + (item.summary.count || 0)) + '</div><div class="theme-leaders">' + esc(item.note) + ' Focus: ' + esc(leaders) + '.</div></div></div>';
+            if (!freshness.fresh) {
+                document.getElementById('theme-focus-list').innerHTML =
+                    '<div class="theme-item disabled"><div class="theme-rank">!</div><div><div class="theme-head"><div class="theme-name">Refresh first</div><div class="theme-status negative">Stale</div></div><div class="theme-meta">Market date ' + esc(freshness.marketDate) + ' | Expected ' + esc(freshness.expected) + '</div><div class="theme-leaders">Do not choose next-day themes from stale data.</div></div></div>';
+                return;
+            }
+            document.getElementById('theme-focus-list').innerHTML = rankThemeFocus().slice(0, 3).map((item, index) => {
+                const row = item.row;
+                const peer = item.health.summary || {};
+                const peerText = 'Peer ' + Math.round(item.health.score) + ' | >EMA20 ' + (peer.above_ema20 || 0) + '/' + (peer.count || 0);
+                const warning = item.health.concentrationRisk ? ' Concentrated leader: peer confirmation is thin.' : '';
+                return '<div class="theme-item" style="--theme-color:' + esc(item.color) + '"><div class="theme-rank">' + (index + 1) + '</div><div><div class="theme-head"><div class="theme-name">' + esc(row.label) + '</div><div class="theme-status ' + item.tone + '">' + esc(item.status) + '</div></div><div class="theme-meta">' + esc(row.code) + ' | ' + esc(row.group) + ' | RS21 ' + esc(Math.round(row.rs_21d)) + ' | Group ' + esc(Math.round(row.group_rank_20d)) + '% | ATRx50 ' + esc(fixed(row.atrx50, 2)) + '</div><div class="theme-leaders">' + esc(item.note) + ' ' + esc(peerText) + '.' + esc(warning) + '</div></div></div>';
             }).join('');
         }
 
