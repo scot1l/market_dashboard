@@ -13,13 +13,33 @@
         .sidebar { width:min(980px,100%); padding:18px; overflow-y:auto; border-right:1px solid var(--line); }
         .chart-pane { flex:1; min-width:360px; padding:18px; display:flex; flex-direction:column; gap:12px; position:sticky; top:0; max-height:100vh; overflow-y:auto; }
         .panel { background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line); border-radius:18px; }
-        .brand, .overview, .guide, .chart-header, .chart-box { padding:16px 18px; }
+        .brand, .overview, .decision-panel, .guide, .chart-header, .chart-box { padding:16px 18px; }
         .brand h1 { margin:6px 0 0; font-size:30px; line-height:1.05; }
         .eyebrow { font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); }
         .muted { color:var(--muted); }
         .overview-grid, .group-grid { display:grid; gap:10px; }
         .overview-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
         .group-grid { grid-template-columns:repeat(5,minmax(0,1fr)); margin-top:12px; }
+        .decision-panel { margin-top:14px; }
+        .decision-grid { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.25fr); gap:14px; }
+        .decision-bias, .theme-focus { min-width:0; }
+        .bias-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+        .bias-title { margin:8px 0 0; font-size:34px; line-height:1; }
+        .decision-badge { display:inline-flex; align-items:center; padding:7px 10px; border-radius:999px; border:1px solid rgba(148,163,184,.18); background:rgba(8,17,31,.88); color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+        .decision-badge.positive { color:var(--up); border-color:rgba(34,197,94,.3); background:rgba(34,197,94,.1); }
+        .decision-badge.negative { color:var(--down); border-color:rgba(239,68,68,.32); background:rgba(239,68,68,.1); }
+        .bias-score { margin-top:8px; font-size:13px; color:var(--muted); }
+        .decision-reasons { display:grid; gap:8px; margin:14px 0 0; padding:0; list-style:none; }
+        .decision-reasons li { padding-top:8px; border-top:1px solid rgba(148,163,184,.1); font-size:13px; line-height:1.45; color:var(--muted); }
+        .theme-list { display:grid; gap:10px; margin-top:12px; }
+        .theme-item { --theme-color:#475569; display:grid; grid-template-columns:34px minmax(0,1fr); gap:10px; align-items:start; padding:12px; border:1px solid rgba(148,163,184,.14); border-left:3px solid var(--theme-color); border-radius:8px; background:rgba(8,17,31,.92); }
+        .theme-rank { display:flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:rgba(15,23,42,.95); color:var(--accent); font-size:12px; font-weight:700; }
+        .theme-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+        .theme-name { font-size:16px; font-weight:700; line-height:1.2; }
+        .theme-status { flex:0 0 auto; padding:5px 8px; border-radius:8px; border:1px solid rgba(148,163,184,.18); color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+        .theme-status.positive { color:var(--up); border-color:rgba(34,197,94,.3); }
+        .theme-status.negative { color:var(--down); border-color:rgba(239,68,68,.32); }
+        .theme-meta, .theme-leaders { margin-top:7px; font-size:12px; line-height:1.45; color:var(--muted); }
         .card { background:rgba(8,17,31,.92); border:1px solid rgba(148,163,184,.14); border-radius:14px; padding:12px; }
         .card .label { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
         .card .value { font-size:24px; font-weight:700; }
@@ -113,7 +133,7 @@
         .breadth-metric-value { margin-top:4px; font-size:13px; font-weight:700; }
         .breadth-notes { margin:0; padding-left:18px; color:var(--muted); font-size:12px; line-height:1.55; }
         .breadth-note { margin:0 0 6px; }
-        @media (max-width:1280px) { .app { flex-direction:column; align-items:stretch; } .sidebar { width:100%; border-right:none; border-bottom:1px solid var(--line); } .chart-pane { position:static; top:auto; max-height:none; min-width:0; overflow:visible; } .chart-box { height:clamp(360px, 58vh, 620px); } .overview-grid, .group-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+        @media (max-width:1280px) { .app { flex-direction:column; align-items:stretch; } .sidebar { width:100%; border-right:none; border-bottom:1px solid var(--line); } .chart-pane { position:static; top:auto; max-height:none; min-width:0; overflow:visible; } .chart-box { height:clamp(360px, 58vh, 620px); } .decision-grid { grid-template-columns:1fr; } .overview-grid, .group-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
         @media (max-width:1280px) { .breadth-signal-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .breadth-layout { grid-template-columns:1fr; } }
         @media (max-width:760px) { .sidebar,.chart-pane { padding:12px; } .brand h1, .breadth-title { font-size:25px; } .overview-grid, .group-grid, .guide-grid, .breadth-signal-grid { grid-template-columns:1fr; } .setup-toolbar { flex-direction:column; align-items:flex-start; } .breadth-row, .breadth-row.compact, .breadth-row.dual { grid-template-columns:1fr 1fr; } .breadth-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); justify-content:stretch; } .chart-box { min-height:320px; height:360px; } }
     </style>
@@ -125,6 +145,25 @@
                 <div class="eyebrow">China ETF Rotation</div>
                 <h1>A-share regime and sector scan</h1>
                 <p id="build-meta" class="muted">Loading market snapshot...</p>
+            </section>
+            <section class="panel decision-panel">
+                <div class="decision-grid">
+                    <div class="decision-bias">
+                        <div class="bias-head">
+                            <div>
+                                <div class="eyebrow">Tomorrow Bias</div>
+                                <h2 class="bias-title" id="tomorrow-bias">Loading</h2>
+                            </div>
+                            <div class="decision-badge" id="tomorrow-bias-badge">Waiting</div>
+                        </div>
+                        <div class="bias-score" id="tomorrow-bias-score">Waiting for snapshot data.</div>
+                        <ul class="decision-reasons" id="tomorrow-bias-reasons"></ul>
+                    </div>
+                    <div class="theme-focus">
+                        <div class="eyebrow">Theme Focus</div>
+                        <div class="theme-list" id="theme-focus-list"></div>
+                    </div>
+                </div>
             </section>
             <section class="panel overview">
                 <div class="overview-grid" id="macro-grid"></div>
@@ -268,6 +307,13 @@
         const fixed = (value, digits) => value == null ? 'N/A' : Number(value).toFixed(digits);
         const groupSummary = name => (breadth.groups || []).find(item => item.group === name);
         const toneClass = tone => tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : '';
+        const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, Number(value) || 0));
+        const allSnapshotRows = () => Object.values(snapshot.groups || {}).flat();
+        const percent = (value, total) => total ? Number(value || 0) / total * 100 : 0;
+        const average = values => {
+            const clean = values.map(Number).filter(Number.isFinite);
+            return clean.length ? clean.reduce((sum, value) => sum + value, 0) / clean.length : null;
+        };
 
         function width(value, min, max) {
             if (value == null || min === max) return 0;
@@ -284,6 +330,152 @@
 
         function card(label, value, metaText) {
             return '<div class="card"><div class="label">' + esc(label) + '</div><div class="value">' + esc(value) + '</div><div class="meta">' + esc(metaText) + '</div></div>';
+        }
+
+        function dateFromYmd(value) {
+            const parts = String(value || '').split('-').map(Number);
+            return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+        }
+
+        function shiftDate(value, days) {
+            const date = dateFromYmd(value);
+            date.setUTCDate(date.getUTCDate() + days);
+            return date.toISOString().slice(0, 10);
+        }
+
+        function previousWeekday(value) {
+            let candidate = shiftDate(value, -1);
+            while ([0, 6].includes(dateFromYmd(candidate).getUTCDay())) {
+                candidate = shiftDate(candidate, -1);
+            }
+            return candidate;
+        }
+
+        function shanghaiNowParts(now = new Date()) {
+            const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+            }).formatToParts(now).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+            return { date: parts.year + '-' + parts.month + '-' + parts.day, hour: Number(parts.hour), minute: Number(parts.minute) };
+        }
+
+        function expectedMarketDate(now = new Date()) {
+            const current = shanghaiNowParts(now);
+            const weekday = dateFromYmd(current.date).getUTCDay();
+            if (weekday === 6) return shiftDate(current.date, -1);
+            if (weekday === 0) return shiftDate(current.date, -2);
+            if (current.hour > 15 || (current.hour === 15 && current.minute >= 45)) return current.date;
+            return previousWeekday(current.date);
+        }
+
+        function freshnessState() {
+            const expected = expectedMarketDate();
+            const marketDate = snapshot.market_date;
+            const builtAt = Date.parse(snapshot.built_at);
+            const ageHours = Number.isFinite(builtAt) ? (Date.now() - builtAt) / 36e5 : null;
+            return { fresh: marketDate >= expected, expected, marketDate, ageHours };
+        }
+
+        function momentumScore(value) {
+            return clamp((Number(value || 0) + 3) / 10 * 100);
+        }
+
+        function rowLeadershipScore(row) {
+            const trend = row.grade === 'A' ? 18 : row.grade === 'B' ? 9 : 0;
+            const extensionPenalty = Number(row.atrx50) > 3 ? 12 : Number(row.atrx50) < -1 ? 8 : 0;
+            const amount = Number(row.amount_z_20d) > 1 ? 8 : Number(row.amount_z_20d) > 0 ? 4 : 0;
+            return clamp(Number(row.rs_21d) * .35 + Number(row.group_rank_20d) * .25 + trend + amount - extensionPenalty);
+        }
+
+        function rankThemeGroups() {
+            return (meta.group_order || []).filter(groupName => groupName !== 'Broad').map(groupName => {
+                const summary = groupSummary(groupName) || {};
+                const rows = snapshot.groups[groupName] || [];
+                const count = summary.count || rows.length;
+                const trendScore = percent(summary.above_ema20, count) * .55 + percent(summary.above_sma50, count) * .45;
+                const rankedRows = rows.slice().sort((a, b) => rowLeadershipScore(b) - rowLeadershipScore(a));
+                const bestScore = rankedRows.length ? rowLeadershipScore(rankedRows[0]) : 0;
+                const avgExtension = average(rankedRows.slice(0, 2).map(row => row.atrx50));
+                const setupScore = percent(rows.filter(row => row.good_setup).length, Math.max(1, count));
+                const score = clamp(Number(summary.avg_rs_21d || 0) * .3 + trendScore * .25 + momentumScore(summary.avg_5d) * .25 + bestScore * .15 + setupScore * .05);
+                const extended = avgExtension != null && avgExtension > 2.8;
+                const status = score >= 60 ? (extended ? 'Watch on pullback' : 'Watch') : score >= 44 ? 'Wait' : 'Avoid';
+                const tone = status === 'Watch' ? 'positive' : status === 'Avoid' ? 'negative' : '';
+                return {
+                    group: groupName, score, status, tone, summary, rows: rankedRows,
+                    color: (meta.group_colors || {})[groupName] || '#475569',
+                    note: status === 'Watch' ? 'Leadership and participation are clean enough for next-day focus.'
+                        : status === 'Watch on pullback' ? 'Leadership is visible, but short-term extension argues against chasing.'
+                        : status === 'Wait' ? 'Mixed theme. Watch for breadth or volume confirmation.'
+                        : 'Weak participation. Not a priority for tomorrow.'
+                };
+            }).sort((a, b) => b.score - a.score);
+        }
+
+        function tomorrowBias() {
+            const freshness = freshnessState();
+            if (!freshness.fresh) {
+                return {
+                    label: 'No Decision', badge: 'Stale Data', tone: 'negative', score: 0,
+                    detail: 'Market date ' + freshness.marketDate + ' | Expected ' + freshness.expected,
+                    reasons: [
+                        'The snapshot is older than the latest expected China session.',
+                        'Refresh data before deciding whether to trade tomorrow.',
+                        'Theme rankings are hidden behind stale market context.'
+                    ]
+                };
+            }
+
+            const overview = breadth.overview || {};
+            const rows = allSnapshotRows();
+            const broad = groupSummary('Broad') || {};
+            const themes = rankThemeGroups();
+            const aboveEma20 = Number(overview.above_ema20_pct || 0);
+            const aboveSma50 = Number(overview.above_sma50_pct || 0);
+            const broadTrend = (percent(broad.above_ema20, broad.count) + percent(broad.above_sma50, broad.count)) / 2;
+            const watchThemes = themes.filter(item => item.status === 'Watch' || item.status === 'Watch on pullback').length;
+            const goodSetups = rows.filter(row => row.good_setup).length;
+            const rawScore = clamp(
+                (aboveEma20 >= 70 ? 25 : aboveEma20 >= 55 ? 16 : aboveEma20 >= 40 ? 8 : 0) +
+                (aboveSma50 >= 55 ? 20 : aboveSma50 >= 40 ? 12 : aboveSma50 >= 25 ? 6 : 0) +
+                (broadTrend >= 75 ? 20 : broadTrend >= 50 ? 12 : 4) +
+                (watchThemes >= 2 ? 20 : watchThemes === 1 ? 12 : 0) +
+                (goodSetups >= 3 ? 15 : goodSetups >= 1 ? 8 : 0)
+            );
+            const score = watchThemes || goodSetups ? rawScore : Math.min(rawScore, 45);
+            const label = score >= 72 ? 'Tradeable' : score >= 48 ? 'Selective' : 'Stand Aside';
+            const tone = label === 'Tradeable' ? 'positive' : label === 'Stand Aside' ? 'negative' : '';
+            const breadthReason = aboveEma20 >= 70
+                ? 'Breadth supports risk: ' + aboveEma20 + '% above EMA20 and ' + aboveSma50 + '% above SMA50.'
+                : aboveEma20 >= 55
+                    ? 'Breadth is usable but not broad: ' + aboveEma20 + '% above EMA20 and ' + aboveSma50 + '% above SMA50.'
+                    : 'Breadth is not strong enough for broad exposure.';
+            const broadReason = broadTrend >= 75
+                ? 'Broad ETFs are holding trend, so next-day longs have market support.'
+                : broadTrend >= 50
+                    ? 'Broad ETFs are mixed. Keep size and theme count selective.'
+                    : 'Broad ETFs are weak. New swing exposure needs a high bar.';
+            const themeReason = watchThemes
+                ? watchThemes + ' theme group' + (watchThemes === 1 ? '' : 's') + ' qualify for next-day focus.'
+                : 'No theme group has a clean enough combination of strength, trend, and participation.';
+            return {
+                label, badge: 'Score ' + Math.round(score), tone, score,
+                detail: 'Market date ' + freshness.marketDate + ' | Built ' + new Date(snapshot.built_at).toLocaleString(),
+                reasons: [breadthReason, broadReason, themeReason]
+            };
+        }
+
+        function renderDecisionPanel() {
+            const bias = tomorrowBias();
+            document.getElementById('tomorrow-bias').textContent = bias.label;
+            document.getElementById('tomorrow-bias-badge').textContent = bias.badge;
+            document.getElementById('tomorrow-bias-badge').className = 'decision-badge ' + bias.tone;
+            document.getElementById('tomorrow-bias-score').textContent = bias.detail;
+            document.getElementById('tomorrow-bias-reasons').innerHTML = bias.reasons.map(reason => '<li>' + esc(reason) + '</li>').join('');
+            document.getElementById('theme-focus-list').innerHTML = rankThemeGroups().slice(0, 3).map((item, index) => {
+                const leaders = item.rows.slice(0, 2).map(row => row.code + ' ' + row.label).join(', ') || 'No clear leader';
+                return '<div class="theme-item" style="--theme-color:' + esc(item.color) + '"><div class="theme-rank">' + (index + 1) + '</div><div><div class="theme-head"><div class="theme-name">' + esc(item.group) + '</div><div class="theme-status ' + item.tone + '">' + esc(item.status) + '</div></div><div class="theme-meta">RS ' + esc(Math.round(item.summary.avg_rs_21d || 0)) + ' | 5D ' + esc(signed(item.summary.avg_5d)) + ' | >EMA20 ' + esc((item.summary.above_ema20 || 0) + '/' + (item.summary.count || 0)) + '</div><div class="theme-leaders">' + esc(item.note) + ' Focus: ' + esc(leaders) + '.</div></div></div>';
+            }).join('');
         }
 
         function visibleRows() {
@@ -545,6 +737,7 @@
                 return;
             }
             renderOverview();
+            renderDecisionPanel();
             renderSwingBreadth();
             renderSetupToolbar();
             renderGroups();
