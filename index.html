@@ -190,7 +190,7 @@
                         <div class="decision-help-item"><strong>Bias Score</strong><span>分数来自全市场 EMA20/MA50 广度、宽基 ETF 趋势、可观察主题数量、Good setup 数量。没有主题或个股设置确认时，最高压到 45。</span></div>
                         <div class="decision-help-item"><strong>Theme Focus 状态</strong><span>Watch = ETF 主题强度、趋势和同组确认同时较好。Watch on pullback = 方向强但短线偏伸展。Wait = 有线索但确认不足。Avoid = 次日不优先看。</span></div>
                         <div class="decision-help-item"><strong>Theme Focus 数字</strong><span>RS21 是相对基准的 21 日相对强弱百分位。Group% 是同组内 20 日表现排名。ATRx50 是偏离 50 日均线的 ATR 倍数。Peer 是同组健康度确认。</span></div>
-                        <div class="decision-help-item"><strong>THS L1 / L2</strong><span>L1 是由同花顺二级行业聚合出的一级行业。L2 是同花顺行业板块本身。THS Score 综合强度、持续性和确认度，来自趋势、宽度、资金流、涨停池和近期涨幅。</span></div>
+                        <div class="decision-help-item"><strong>THS L1 / L2</strong><span>L1 是由同花顺二级行业聚合出的一级行业。L2 是同花顺行业板块本身。行业也按 ETF 同口径计算 Grade、RS21、Group%、ATRx50、AmtZ 和 Setup。</span></div>
                         <div class="decision-help-item"><strong>THS 状态</strong><span>Watch = Score 不低于 72 且不弱。Watch on pullback = Score 不低于 72 但 5 日涨幅或量能偏伸展。Wait = 56 到 71。Avoid = 低于 56 或跌破 20 日线且 5 日偏弱。</span></div>
                         <div class="decision-help-item"><strong>Overview / Group</strong><span>Tone 看宽基 ETF 参与度。Strongest / Weakest 按平均 RS21 排名。Breadth 显示 ETF 站上 EMA20 / SMA50 的比例。组卡片的 Avg5D、AvgRS、>EMA20、>SMA50 用来判断同组是否共振。</span></div>
                         <div class="decision-help-item"><strong>Regime / Momentum</strong><span>Regime 分数综合成交额、北向、涨跌家数、涨停跌停差和行业均线参与度。Expansion >=72，Constructive >=58，Mixed >=45，Defensive >=32，低于 32 为 Washout。Momentum 看涨停池、强势池、昨日涨停反馈、炸板率和跌停数。</span></div>
@@ -340,6 +340,8 @@
         const klass = value => value > 0 ? 'up' : value < 0 ? 'down' : '';
         const signed = value => value == null ? 'N/A' : (value > 0 ? '+' : '') + Number(value).toFixed(2) + '%';
         const fixed = (value, digits) => value == null ? 'N/A' : Number(value).toFixed(digits);
+        const roundedValue = value => Number.isFinite(Number(value)) ? Math.round(Number(value)) : 'N/A';
+        const fixedValue = (value, digits) => Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : 'N/A';
         const groupSummary = name => (breadth.groups || []).find(item => item.group === name);
         const toneClass = tone => tone === 'positive' ? 'positive' : tone === 'negative' ? 'negative' : '';
         const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, Number(value) || 0));
@@ -544,6 +546,19 @@
             return status === 'Watch' ? 'positive' : status === 'Avoid' ? 'negative' : status === 'Watch on pullback' ? 'caution' : '';
         }
 
+        function thsMetricMeta(item) {
+            if (!item || item.grade == null || item.rs_21d == null) {
+                return 'Score ' + esc(roundedValue(item && item.score)) + ' | 5D ' + esc(signedShort(item && item.change_5d_pct, 1)) + ' | Breadth ' + esc(roundedValue(item && item.breadth_pct)) + '%';
+            }
+            const fiveDay = item['5d'] != null ? item['5d'] : item.change_5d_pct;
+            return 'Grade ' + esc(item.grade) + ' | RS21 ' + esc(roundedValue(item.rs_21d)) + ' | Group ' + esc(roundedValue(item.group_rank_20d)) + '% | 5D ' + esc(signedShort(fiveDay, 1)) + ' | ATRx50 ' + esc(fixedValue(item.atrx50, 2));
+        }
+
+        function thsSignalDetail(item) {
+            const setup = item.good_setup ? '<span class="setup-badge">' + esc(item.good_setup_reason || 'Good setup') + '</span> ' : '';
+            return setup + 'Score ' + esc(roundedValue(item.score)) + ' | Breadth ' + esc(roundedValue(item.breadth_pct)) + '% | AmtZ ' + esc(fixedValue(item.amount_z_20d, 2)) + ' | Flow ' + esc(flowValue(item.net_flow_100m));
+        }
+
         function renderIndustryWatchList() {
             const watch = breadthSwing && breadthSwing.market_date === snapshot.market_date ? breadthSwing.industry_watchlist : null;
             if (!watch) {
@@ -553,10 +568,10 @@
             }
             const level1Cards = (watch.level1 || []).slice(0, 2).map((item, index) => {
                 const leaders = (item.leaders || []).map(child => child.name).join(', ');
-                return '<div class="theme-item" style="--theme-color:#38bdf8"><div class="theme-rank">L1</div><div><div class="theme-head"><div class="theme-name">' + esc(item.name) + '</div><div class="theme-status ' + statusTone(item.status) + '">' + esc(item.status) + '</div></div><div class="theme-meta">Score ' + esc(Math.round(item.score)) + ' | 5D ' + esc(signedShort(item.change_5d_pct, 1)) + ' | Breadth ' + esc(Math.round(item.breadth_pct)) + '% | Flow ' + esc(flowValue(item.net_flow_100m)) + '</div><div class="theme-leaders">Level-2 leaders: ' + esc(leaders || 'None') + '.</div></div></div>';
+                return '<div class="theme-item" style="--theme-color:#38bdf8"><div class="theme-rank">L1</div><div><div class="theme-head"><div class="theme-name">' + esc(item.name) + '</div><div class="theme-status ' + statusTone(item.status) + '">' + esc(item.status) + '</div></div><div class="theme-meta">' + thsMetricMeta(item) + '</div><div class="theme-leaders">' + thsSignalDetail(item) + ' | Level-2 leaders: ' + esc(leaders || 'None') + '.</div></div></div>';
             });
             const level2Cards = (watch.level2 || []).slice(0, 3).map((item, index) =>
-                '<div class="theme-item" style="--theme-color:#34d399"><div class="theme-rank">L2</div><div><div class="theme-head"><div class="theme-name">' + esc(item.name) + '</div><div class="theme-status ' + statusTone(item.status) + '">' + esc(item.status) + '</div></div><div class="theme-meta">' + esc(item.level1) + ' | Score ' + esc(Math.round(item.score)) + ' | 5D ' + esc(signedShort(item.change_5d_pct, 1)) + ' | Breadth ' + esc(Math.round(item.breadth_pct)) + '%</div><div class="theme-leaders">Leader: ' + esc(item.leader || 'None') + ' ' + esc(signedShort(item.leader_change_pct, 1)) + ' | Flow ' + esc(flowValue(item.net_flow_100m)) + '.</div></div></div>'
+                '<div class="theme-item" style="--theme-color:#34d399"><div class="theme-rank">L2</div><div><div class="theme-head"><div class="theme-name">' + esc(item.name) + '</div><div class="theme-status ' + statusTone(item.status) + '">' + esc(item.status) + '</div></div><div class="theme-meta">' + esc(item.level1) + ' | ' + thsMetricMeta(item) + '</div><div class="theme-leaders">' + thsSignalDetail(item) + ' | Leader: ' + esc(item.leader || 'None') + ' ' + esc(signedShort(item.leader_change_pct, 1)) + '.</div></div></div>'
             );
             document.getElementById('industry-watch-list').innerHTML = level1Cards.concat(level2Cards).join('');
         }

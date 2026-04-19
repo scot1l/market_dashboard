@@ -751,9 +751,107 @@ def ths_watch_status(score: float, *, extended: bool = False, weak: bool = False
     return "Avoid"
 
 
+def normalize_ths_index_history(history: pd.DataFrame) -> pd.DataFrame:
+    if history.shape[1] < 7:
+        raise ValueError(f"Unexpected THS index history shape: {history.shape}")
+    normalized = pd.DataFrame(
+        {
+            "date": pd.to_datetime(history.iloc[:, 0]),
+            "open": pd.to_numeric(history.iloc[:, 1], errors="coerce"),
+            "high": pd.to_numeric(history.iloc[:, 2], errors="coerce"),
+            "low": pd.to_numeric(history.iloc[:, 3], errors="coerce"),
+            "close": pd.to_numeric(history.iloc[:, 4], errors="coerce"),
+            "volume": pd.to_numeric(history.iloc[:, 5], errors="coerce"),
+            "amount": pd.to_numeric(history.iloc[:, 6], errors="coerce"),
+        }
+    )
+    normalized = normalized.dropna(subset=["date", "open", "high", "low", "close", "volume", "amount"])
+    normalized = normalized.sort_values("date").drop_duplicates(subset="date").reset_index(drop=True)
+    if len(normalized) < 60:
+        raise ValueError("Insufficient THS index history for ETF-style metrics")
+    return normalized
+
+
+def assign_percentile_rank(
+    frame: pd.DataFrame,
+    source_column: str,
+    output_column: str,
+    group_column: str | None = None,
+) -> None:
+    frame[output_column] = 50.0
+    grouped = [(None, frame)] if group_column is None else frame.groupby(group_column, sort=False)
+    for _, group in grouped:
+        valid = pd.to_numeric(group[source_column], errors="coerce").dropna()
+        if len(valid) <= 1:
+            frame.loc[group.index, output_column] = 50.0
+            continue
+        ranks = valid.rank(method="average")
+        frame.loc[valid.index, output_column] = ((ranks - 1) / (len(valid) - 1) * 100).round(0)
+
+
+def weighted_average(group: pd.DataFrame, column: str, weight_column: str = "company_count") -> float:
+    values = pd.to_numeric(group[column], errors="coerce")
+    weights = pd.to_numeric(group[weight_column], errors="coerce").fillna(1).clip(lower=1)
+    valid = values.notna()
+    if not valid.any():
+        return 0.0
+    return float((values[valid] * weights[valid]).sum() / weights[valid].sum())
+
+
+def aggregate_grade(group: pd.DataFrame) -> str:
+    grade_scores = group["grade"].map({"A": 2.0, "B": 1.0, "C": 0.0}).fillna(1.0)
+    weights = pd.to_numeric(group["company_count"], errors="coerce").fillna(1).clip(lower=1)
+    score = float((grade_scores * weights).sum() / weights.sum())
+    if score >= 1.45:
+        return "A"
+    if score <= 0.55:
+        return "C"
+    return "B"
+
+
+def etf_style_setup_reason(row: pd.Series | Dict[str, object]) -> str | None:
+    grade = str(row.get("grade", ""))
+    rs_21d = float(row.get("rs_21d", 0) or 0)
+    group_rank = float(row.get("group_rank_20d", 0) or 0)
+    amount_z = float(row.get("amount_z_20d", 0) or 0)
+    atrx50 = float(row.get("atrx50", 0) or 0)
+    above_ema20 = bool(row.get("above_ema20", False))
+
+    trend_setup = grade == "A" and rs_21d >= 80 and group_rank >= 70 and amount_z > 0 and 0 <= atrx50 <= 2
+    early_rotation = grade == "B" and above_ema20 and 60 <= rs_21d <= 80 and group_rank >= 60 and amount_z >= 1 and -1 <= atrx50 <= 1
+    if trend_setup:
+        return "Trend setup"
+    if early_rotation:
+        return "Early rotation"
+    return None
+
+
+def industry_metric_payload(row: pd.Series | Dict[str, object]) -> Dict[str, object]:
+    reason = row.get("good_setup_reason")
+    if reason is None or pd.isna(reason) or reason == "":
+        reason = etf_style_setup_reason(row)
+    return {
+        "daily": round(float(row.get("daily", 0) or 0), 2),
+        "5d": round(float(row.get("5d", row.get("change_5d_pct", 0)) or 0), 2),
+        "20d": round(float(row.get("20d", row.get("change_20d_pct", 0)) or 0), 2),
+        "atr_pct": round(float(row.get("atr_pct", 0) or 0), 2),
+        "atrx50": round(float(row.get("atrx50", 0) or 0), 2),
+        "rs_21d": round(float(row.get("rs_21d", 50) or 50), 0),
+        "group_rank_20d": round(float(row.get("group_rank_20d", 50) or 50), 0),
+        "amount_20d_avg": round(float(row.get("amount_20d_avg", 0) or 0), 1),
+        "amount_z_20d": round(float(row.get("amount_z_20d", 0) or 0), 2),
+        "grade": str(row.get("grade", "B") or "B"),
+        "good_setup": bool(reason),
+        "good_setup_reason": reason,
+    }
+
+
 def build_ths_industry_watchlist(industry_frame: pd.DataFrame) -> Dict[str, object]:
     watch_frame = industry_frame.copy()
     watch_frame["level1"] = watch_frame["name"].map(THS_LEVEL1_BY_LEVEL2).fillna("未分组")
+    assign_percentile_rank(watch_frame, "20d", "group_rank_20d", "level1")
+    watch_frame["good_setup_reason"] = watch_frame.apply(etf_style_setup_reason, axis=1)
+    watch_frame["good_setup"] = watch_frame["good_setup_reason"].notna()
     watch_frame["watch_score"] = (
         watch_frame["strength_score"] * 0.42
         + watch_frame["persistence_score"] * 0.26
@@ -773,6 +871,7 @@ def build_ths_industry_watchlist(industry_frame: pd.DataFrame) -> Dict[str, obje
                 "change_pct": round(float(row["change_pct"]), 2),
                 "change_5d_pct": round(float(row["change_5d_pct"]), 2),
                 "change_20d_pct": round(float(row["change_20d_pct"]), 2),
+                **industry_metric_payload(row),
                 "net_flow_100m": round(float(row["net_flow_100m"]), 2),
                 "breadth_pct": round(float(row["breadth_ratio"]) * 100, 1),
                 "above_20dma": bool(row["above_20dma"]),
@@ -795,6 +894,18 @@ def build_ths_industry_watchlist(industry_frame: pd.DataFrame) -> Dict[str, obje
             + float(leaders["watch_score"].mean()) * 0.25
             + breadth_pct * 0.20
         )
+        l1_metric = {
+            "daily": weighted_average(group, "daily"),
+            "5d": weighted_average(group, "5d"),
+            "20d": weighted_average(group, "20d"),
+            "atr_pct": weighted_average(group, "atr_pct"),
+            "atrx50": weighted_average(group, "atrx50"),
+            "rs_21d": weighted_average(group, "rs_21d"),
+            "amount_20d_avg": float(pd.to_numeric(group["amount_20d_avg"], errors="coerce").fillna(0).sum()),
+            "amount_z_20d": weighted_average(group, "amount_z_20d"),
+            "grade": aggregate_grade(group),
+            "above_ema20": weighted_average(group.assign(above_ema20_numeric=group["above_ema20"].astype(int)), "above_ema20_numeric") >= 0.5,
+        }
         level1_rows.append(
             {
                 "name": level1_name,
@@ -802,6 +913,8 @@ def build_ths_industry_watchlist(industry_frame: pd.DataFrame) -> Dict[str, obje
                 "score": round(score, 1),
                 "change_pct": round(float(group["change_pct"].mean()), 2),
                 "change_5d_pct": round(float(group["change_5d_pct"].mean()), 2),
+                "change_20d_pct": round(float(group["change_20d_pct"].mean()), 2),
+                **l1_metric,
                 "net_flow_100m": round(float(group["net_flow_100m"].sum()), 2),
                 "breadth_pct": round(breadth_pct, 1),
                 "child_count": int(len(group)),
@@ -820,7 +933,18 @@ def build_ths_industry_watchlist(industry_frame: pd.DataFrame) -> Dict[str, obje
             }
         )
 
-    level1 = sorted(level1_rows, key=lambda item: item["score"], reverse=True)[:8]
+    level1_frame = pd.DataFrame(level1_rows)
+    if not level1_frame.empty:
+        assign_percentile_rank(level1_frame, "20d", "group_rank_20d")
+        level1_frame["good_setup_reason"] = level1_frame.apply(etf_style_setup_reason, axis=1)
+        level1_frame["good_setup"] = level1_frame["good_setup_reason"].notna()
+        level1 = sorted(
+            [{**row, **industry_metric_payload(row)} for row in level1_frame.to_dict(orient="records")],
+            key=lambda item: item["score"],
+            reverse=True,
+        )[:8]
+    else:
+        level1 = []
     return {
         "summary": "THS level-1 industries are aggregated from the public THS industry-board list; level-2 entries are the strongest THS industry boards by strength, persistence, and confirmation.",
         "level1": level1,
@@ -873,8 +997,12 @@ def build_swing_breadth(
     industry_rows = []
     for _, row in industry_today.iterrows():
         history = fetch_industry_index_history(row["name"], history_start, market_date_compact)
-        close = history["收盘价"]
-        amount = history["成交额"]
+        history = normalize_ths_index_history(history)
+        close = history["close"]
+        amount = history["amount"]
+        ema20 = history["close"].ewm(span=20, adjust=False).mean().iloc[-1]
+        atr = calculate_atr(history)
+        rs_frame = calculate_relative_strength(history, benchmark_history)
         sma20 = float(close.rolling(window=20).mean().iloc[-1])
         sma50 = float(close.rolling(window=50).mean().iloc[-1])
         industry_rows.append(
@@ -882,7 +1010,17 @@ def build_swing_breadth(
                 "name": row["name"],
                 "company_count": int(row["company_count"]),
                 "above_20dma": bool(close.iloc[-1] > sma20),
+                "above_ema20": bool(close.iloc[-1] > ema20),
                 "above_50dma": bool(close.iloc[-1] > sma50),
+                "daily": round(rolling_return(close, 1), 2),
+                "5d": round(rolling_return(close, 5), 2),
+                "20d": round(rolling_return(close, 20), 2),
+                "atr_pct": round((atr / close.iloc[-1]) * 100, 2),
+                "atrx50": round((close.iloc[-1] - sma50) / atr, 2),
+                "rs_21d": round(percentile_of_last(rs_frame["rolling_rrs"]), 0),
+                "amount_20d_avg": round(amount.tail(20).mean() / 100000000, 1),
+                "amount_z_20d": round(zscore_of_last(amount), 2),
+                "grade": calculate_grade(history),
                 "change_5d_pct_hist": round(rolling_return(close, 5), 2),
                 "change_20d_pct_hist": round(rolling_return(close, 20), 2),
                 "positive_days_5": positive_day_count(close, 5),
