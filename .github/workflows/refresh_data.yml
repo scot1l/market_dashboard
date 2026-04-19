@@ -7,6 +7,9 @@ on:
     - cron: '30 20 * * 1-5'
   workflow_dispatch: # Allow manual run
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest

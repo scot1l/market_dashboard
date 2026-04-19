@@ -39,6 +39,24 @@ Then open:
 
 - `http://localhost:8000`
 
+## Deploy to GitHub Pages
+
+This repo is a static site, so GitHub Pages can serve it directly from the
+generated files in `index.html` and `data/`.
+
+1. Push `main` to GitHub.
+2. In GitHub, open **Settings > Pages**.
+3. Set **Source** to **GitHub Actions**.
+4. Run the **Deploy GitHub Pages** workflow, or push a commit to `main`.
+
+For the current GitHub repository, the site URL will be:
+
+- `https://scot1l.github.io/market_dashboard/`
+
+The **Refresh dashboard data** workflow keeps the generated JSON and chart files
+updated. When it completes successfully, the Pages deployment workflow publishes
+the refreshed static site.
+
 ## Generated files
 
 The builder writes:
