@@ -44,6 +44,11 @@
         .theme-item.disabled { border-left-color:var(--down); opacity:.82; }
         .industry-watch-head { display:flex; justify-content:space-between; gap:10px; align-items:end; margin-top:16px; padding-top:14px; border-top:1px solid rgba(148,163,184,.12); }
         .industry-watch-sub { font-size:12px; color:var(--muted); white-space:nowrap; }
+        .industry-watch-note { margin-top:8px; font-size:12px; line-height:1.45; color:var(--muted); }
+        .industry-section-label { margin-top:4px; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); }
+        .industry-scroll { display:grid; gap:8px; max-height:420px; overflow-y:auto; padding-right:4px; }
+        .industry-scroll.level1 { max-height:300px; }
+        .theme-item.ths-compact { padding:10px; }
         .decision-help { margin-top:14px; padding-top:12px; border-top:1px solid rgba(148,163,184,.12); }
         .decision-help summary { display:flex; justify-content:space-between; align-items:center; cursor:pointer; color:var(--accent); font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; list-style:none; }
         .decision-help summary::-webkit-details-marker { display:none; }
@@ -559,6 +564,19 @@
             return setup + 'Score ' + esc(roundedValue(item.score)) + ' | Breadth ' + esc(roundedValue(item.breadth_pct)) + '% | AmtZ ' + esc(fixedValue(item.amount_z_20d, 2)) + ' | Flow ' + esc(flowValue(item.net_flow_100m));
         }
 
+        function thsIndustryCard(item, level, color) {
+            const leader = level === 'L1'
+                ? 'Level-2 leaders: ' + esc(((item.leaders || []).map(child => child.name).join(', ')) || 'None') + '.'
+                : 'Leader: ' + esc(item.leader || 'None') + ' ' + esc(signedShort(item.leader_change_pct, 1)) + '.';
+            const prefix = level === 'L2' ? esc(item.level1) + ' | ' : '';
+            return '<div class="theme-item ths-compact" style="--theme-color:' + color + '"><div class="theme-rank">' + level + '</div><div><div class="theme-head"><div class="theme-name">' + esc(item.name) + '</div><div class="theme-status ' + statusTone(item.status) + '">' + esc(item.status) + '</div></div><div class="theme-meta">' + prefix + thsMetricMeta(item) + '</div><div class="theme-leaders">' + thsSignalDetail(item) + ' | ' + leader + '</div></div></div>';
+        }
+
+        function thsIndustrySection(title, items, level, color) {
+            if (!items.length) return '';
+            return '<div class="industry-section-label">' + esc(title) + ' (' + items.length + ')</div><div class="industry-scroll ' + (level === 'L1' ? 'level1' : 'level2') + '">' + items.map(item => thsIndustryCard(item, level, color)).join('') + '</div>';
+        }
+
         function renderIndustryWatchList() {
             const watch = breadthSwing && breadthSwing.market_date === snapshot.market_date ? breadthSwing.industry_watchlist : null;
             if (!watch) {
@@ -566,14 +584,12 @@
                     '<div class="theme-item disabled"><div class="theme-rank">THS</div><div><div class="theme-head"><div class="theme-name">Waiting for industry data</div><div class="theme-status">Optional</div></div><div class="theme-meta">The optional THS breadth build has not produced level-1/level-2 data for this snapshot.</div><div class="theme-leaders">Run the refresh workflow after close; the panel appears when THS pages are available.</div></div></div>';
                 return;
             }
-            const level1Cards = (watch.level1 || []).slice(0, 2).map((item, index) => {
-                const leaders = (item.leaders || []).map(child => child.name).join(', ');
-                return '<div class="theme-item" style="--theme-color:#38bdf8"><div class="theme-rank">L1</div><div><div class="theme-head"><div class="theme-name">' + esc(item.name) + '</div><div class="theme-status ' + statusTone(item.status) + '">' + esc(item.status) + '</div></div><div class="theme-meta">' + thsMetricMeta(item) + '</div><div class="theme-leaders">' + thsSignalDetail(item) + ' | Level-2 leaders: ' + esc(leaders || 'None') + '.</div></div></div>';
-            });
-            const level2Cards = (watch.level2 || []).slice(0, 3).map((item, index) =>
-                '<div class="theme-item" style="--theme-color:#34d399"><div class="theme-rank">L2</div><div><div class="theme-head"><div class="theme-name">' + esc(item.name) + '</div><div class="theme-status ' + statusTone(item.status) + '">' + esc(item.status) + '</div></div><div class="theme-meta">' + esc(item.level1) + ' | ' + thsMetricMeta(item) + '</div><div class="theme-leaders">' + thsSignalDetail(item) + ' | Leader: ' + esc(item.leader || 'None') + ' ' + esc(signedShort(item.leader_change_pct, 1)) + '.</div></div></div>'
-            );
-            document.getElementById('industry-watch-list').innerHTML = level1Cards.concat(level2Cards).join('');
+            const level1 = watch.level1 || [];
+            const level2 = watch.level2 || [];
+            document.getElementById('industry-watch-list').innerHTML =
+                '<div class="industry-watch-note">Full THS watchlist sorted by score: ' + level1.length + ' level-1 groups and ' + level2.length + ' level-2 industries.</div>' +
+                thsIndustrySection('Level 1 industries', level1, 'L1', '#38bdf8') +
+                thsIndustrySection('Level 2 industries', level2, 'L2', '#34d399');
         }
 
         function visibleRows() {

@@ -899,7 +899,7 @@ def build_ths_industry_watchlist(industry_frame: pd.DataFrame) -> Dict[str, obje
     watch_frame["weak"] = (~watch_frame["above_20dma"].astype(bool)) & (watch_frame["change_5d_pct"] <= 0)
 
     level2 = []
-    for _, row in watch_frame.sort_values(["watch_score", "strength_score"], ascending=False).head(12).iterrows():
+    for _, row in watch_frame.sort_values(["watch_score", "strength_score"], ascending=False).iterrows():
         level2.append(
             {
                 "name": row["name"],
@@ -980,7 +980,7 @@ def build_ths_industry_watchlist(industry_frame: pd.DataFrame) -> Dict[str, obje
             [{**row, **industry_metric_payload(row)} for row in level1_frame.to_dict(orient="records")],
             key=lambda item: item["score"],
             reverse=True,
-        )[:8]
+        )
     else:
         level1 = []
     return {
