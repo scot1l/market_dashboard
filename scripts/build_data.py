@@ -4,11 +4,12 @@ import argparse
 import json
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 from functools import lru_cache
 from io import StringIO
 from pathlib import Path
 from typing import Dict, List
+from zoneinfo import ZoneInfo
 
 import akshare as ak
 import matplotlib
@@ -21,6 +22,8 @@ import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "config" / "china_etf_universe.json"
+CHINA_TZ = ZoneInfo("Asia/Shanghai")
+AFTER_CLOSE_READY_TIME = time(15, 45)
 THS_LEVEL1_BY_LEVEL2 = {
     "半导体": "电子",
     "元件": "电子",
@@ -118,6 +121,41 @@ THS_LEVEL1_BY_LEVEL2 = {
 def load_universe() -> Dict[str, object]:
     with CONFIG_PATH.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def previous_weekday(day):
+    candidate = day - timedelta(days=1)
+    while candidate.weekday() >= 5:
+        candidate -= timedelta(days=1)
+    return candidate
+
+
+def expected_market_date(now: datetime | None = None) -> str:
+    current = now or datetime.now(CHINA_TZ)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=CHINA_TZ)
+    else:
+        current = current.astimezone(CHINA_TZ)
+
+    day = current.date()
+    if day.weekday() == 5:
+        return (day - timedelta(days=1)).isoformat()
+    if day.weekday() == 6:
+        return (day - timedelta(days=2)).isoformat()
+    if current.time() >= AFTER_CLOSE_READY_TIME:
+        return day.isoformat()
+    return previous_weekday(day).isoformat()
+
+
+def assert_fresh_market_date(market_date: str, allow_stale: bool = False, now: datetime | None = None) -> None:
+    expected = expected_market_date(now)
+    if market_date >= expected or allow_stale:
+        return
+    raise RuntimeError(
+        f"Generated ETF snapshot is stale: market_date={market_date}, expected={expected}. "
+        "The upstream ETF history source has not published the latest China session yet; "
+        "skip this commit and let the next scheduled retry run."
+    )
 
 
 def provider_symbol(exchange: str, code: str) -> str:
@@ -1416,6 +1454,11 @@ def write_json(path: Path, payload: Dict[str, object]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out-dir", default="data", help="Output directory")
+    parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help="Write files even when the latest ETF source date is older than the expected China session.",
+    )
     args = parser.parse_args()
 
     universe = load_universe()
@@ -1439,6 +1482,7 @@ def main() -> None:
         groups[item["group"]].append(row)
 
     latest_market_date = max(row["market_date"] for rows in groups.values() for row in rows)
+    assert_fresh_market_date(latest_market_date, allow_stale=args.allow_stale)
     for group_name in universe["group_order"]:
         assign_group_ranks(groups[group_name])
         assign_good_setups(groups[group_name])
@@ -1475,8 +1519,10 @@ def main() -> None:
         benchmark_history = fetch_history("SSE", universe["default_symbol"], history_cache)
         swing_breadth = build_swing_breadth(latest_market_date, built_at, benchmark_history)
     except Exception as exc:
-        swing_breadth_path.unlink(missing_ok=True)
-        print(f"Warning: skipped {swing_breadth_path} because the optional swing breadth build failed: {exc}")
+        if swing_breadth_path.exists():
+            print(f"Warning: keeping existing {swing_breadth_path} because the optional swing breadth build failed: {exc}")
+        else:
+            print(f"Warning: skipped {swing_breadth_path} because the optional swing breadth build failed and no previous file exists: {exc}")
     else:
         write_json(swing_breadth_path, swing_breadth)
         print(f"Wrote {swing_breadth_path}")
