@@ -71,8 +71,13 @@ The builder writes:
 - `data/snapshot.json`
 - `data/meta.json`
 - `data/breadth.json`
-- `data/breadth_swing.json` (optional; skipped when live breadth sources are unavailable or out of sync)
+- `data/breadth_swing.json` (required for the A-share Breadth and THS Industry Watch panels)
 - `data/charts/*.png`
+
+The build fails by default if `data/breadth_swing.json` cannot be generated for
+the same `market_date` as `data/snapshot.json`. This prevents GitHub Pages from
+publishing a mixed-date dashboard where ETF data is fresh but industry breadth is
+stale. For local ETF-only debugging, pass `--allow-partial-breadth`.
 
 ## Recommended usage
 

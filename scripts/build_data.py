@@ -1451,6 +1451,33 @@ def write_json(path: Path, payload: Dict[str, object]) -> None:
         json.dump(payload, handle, ensure_ascii=False, indent=2)
 
 
+def read_json(path: Path) -> Dict[str, object]:
+    with path.open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected JSON object in {path}")
+    return payload
+
+
+def assert_swing_breadth_fresh(path: Path, market_date: str) -> None:
+    if not path.exists():
+        raise RuntimeError(f"Swing breadth output is missing: {path}")
+
+    payload = read_json(path)
+    swing_market_date = payload.get("market_date")
+    if swing_market_date != market_date:
+        raise RuntimeError(
+            f"Swing breadth output is stale: market_date={swing_market_date}, expected={market_date}. "
+            "Do not publish a mixed-date dashboard; retry after THS breadth sources refresh."
+        )
+
+    watchlist = payload.get("industry_watchlist")
+    if not isinstance(watchlist, dict):
+        raise RuntimeError(f"Swing breadth output is missing industry_watchlist: {path}")
+    if not watchlist.get("level1") or not watchlist.get("level2"):
+        raise RuntimeError(f"Swing breadth output has an incomplete THS industry watchlist: {path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out-dir", default="data", help="Output directory")
@@ -1458,6 +1485,11 @@ def main() -> None:
         "--allow-stale",
         action="store_true",
         help="Write files even when the latest ETF source date is older than the expected China session.",
+    )
+    parser.add_argument(
+        "--allow-partial-breadth",
+        action="store_true",
+        help="Keep stale or missing swing breadth output when optional breadth sources are unavailable.",
     )
     args = parser.parse_args()
 
@@ -1513,19 +1545,27 @@ def main() -> None:
     print(f"Wrote {out_dir / 'meta.json'}")
     print(f"Wrote {out_dir / 'breadth.json'}")
 
-    # The swing breadth dataset depends on several live third-party pages, so a failure here
-    # should disable only the optional panel and never block the core ETF snapshot files.
+    # GitHub Pages should never publish a mixed-date dashboard. Use
+    # --allow-partial-breadth only for local ETF-only debugging.
     try:
         benchmark_history = fetch_history("SSE", universe["default_symbol"], history_cache)
         swing_breadth = build_swing_breadth(latest_market_date, built_at, benchmark_history)
     except Exception as exc:
-        if swing_breadth_path.exists():
+        if args.allow_partial_breadth and swing_breadth_path.exists():
             print(f"Warning: keeping existing {swing_breadth_path} because the optional swing breadth build failed: {exc}")
-        else:
+        elif args.allow_partial_breadth:
             print(f"Warning: skipped {swing_breadth_path} because the optional swing breadth build failed and no previous file exists: {exc}")
+        else:
+            raise RuntimeError(
+                "Failed to build swing breadth data. The dashboard would otherwise publish fresh ETF data "
+                "with stale or missing industry breadth data."
+            ) from exc
     else:
         write_json(swing_breadth_path, swing_breadth)
         print(f"Wrote {swing_breadth_path}")
+
+    if not args.allow_partial_breadth:
+        assert_swing_breadth_fresh(swing_breadth_path, latest_market_date)
 
 
 if __name__ == "__main__":

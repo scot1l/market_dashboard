@@ -578,10 +578,13 @@
         }
 
         function renderIndustryWatchList() {
-            const watch = breadthSwing && breadthSwing.market_date === snapshot.market_date ? breadthSwing.industry_watchlist : null;
+            const issue = breadthSwingIssue();
+            const watch = issue ? null : breadthSwing.industry_watchlist;
             if (!watch) {
                 document.getElementById('industry-watch-list').innerHTML =
-                    '<div class="theme-item disabled"><div class="theme-rank">THS</div><div><div class="theme-head"><div class="theme-name">Waiting for industry data</div><div class="theme-status">Optional</div></div><div class="theme-meta">The optional THS breadth build has not produced level-1/level-2 data for this snapshot.</div><div class="theme-leaders">Run the refresh workflow after close; the panel appears when THS pages are available.</div></div></div>';
+                    issue
+                        ? disabledThemeItem('THS', issue.title, issue.status, issue.meta, issue.leaders)
+                        : disabledThemeItem('THS', 'Waiting for industry data', 'Missing', 'The THS breadth build did not include level-1/level-2 data for this snapshot.', 'Run the refresh workflow after close; the panel appears when THS pages are available.');
                 return;
             }
             const level1 = watch.level1 || [];
@@ -648,9 +651,54 @@
             return '<div class="breadth-row dual"><div><div class="breadth-name">' + esc(item.name) + '</div><div class="breadth-meta">' + esc(item.detail) + '</div><div class="breadth-chip ' + (negative ? 'negative' : 'positive') + '">' + esc(negative ? scoreLabel : item.leadership) + '</div></div><div class="breadth-stat wide">' + esc(scoreLabel) + '</div></div>';
         }
 
+        function disabledThemeItem(rank, title, status, meta, leaders) {
+            return '<div class="theme-item disabled"><div class="theme-rank">' + esc(rank) + '</div><div><div class="theme-head"><div class="theme-name">' + esc(title) + '</div><div class="theme-status negative">' + esc(status) + '</div></div><div class="theme-meta">' + esc(meta) + '</div><div class="theme-leaders">' + esc(leaders) + '</div></div></div>';
+        }
+
+        function breadthSwingIssue() {
+            if (!breadthSwing) {
+                return {
+                    title: 'Waiting for industry data',
+                    status: 'Missing',
+                    meta: 'No breadth_swing.json was loaded for snapshot ' + snapshot.market_date + '.',
+                    leaders: 'Run the refresh workflow after THS sources are available.'
+                };
+            }
+            if (breadthSwing.market_date !== snapshot.market_date) {
+                return {
+                    title: 'Industry data is stale',
+                    status: 'Stale',
+                    meta: 'Snapshot ' + snapshot.market_date + ' | Industry ' + (breadthSwing.market_date || 'unknown') + '.',
+                    leaders: 'The refresh produced fresh ETF data without matching THS breadth data, so industry rankings are hidden.'
+                };
+            }
+            return null;
+        }
+
         function renderSwingBreadth() {
             const panel = document.getElementById('swing-breadth-panel');
-            if (!breadthSwing || breadthSwing.market_date !== snapshot.market_date) { panel.style.display = 'none'; return; }
+            const issue = breadthSwingIssue();
+            if (issue) {
+                panel.style.display = 'block';
+                document.getElementById('breadth-summary').textContent = issue.meta;
+                document.getElementById('breadth-regime-copy').textContent = issue.leaders;
+                document.getElementById('breadth-regime-badge').textContent = issue.status;
+                document.getElementById('breadth-regime-badge').className = 'breadth-badge negative';
+                document.getElementById('breadth-regime-signals').innerHTML = '';
+                document.getElementById('breadth-sector-copy').textContent = 'Industry and concept leadership is not shown until dates match.';
+                document.getElementById('breadth-sector-signals').innerHTML = '';
+                document.getElementById('breadth-industry-list').innerHTML = disabledThemeItem('THS', issue.title, issue.status, issue.meta, issue.leaders);
+                document.getElementById('breadth-concept-list').innerHTML = '';
+                document.getElementById('breadth-momentum-copy').textContent = 'Momentum health is not shown until breadth data is current.';
+                document.getElementById('breadth-momentum-badge').textContent = issue.status;
+                document.getElementById('breadth-momentum-badge').className = 'breadth-badge negative';
+                document.getElementById('breadth-momentum-signals').innerHTML = '';
+                document.getElementById('breadth-leadership-copy').textContent = 'Leadership quality is gated by the same market date.';
+                document.getElementById('breadth-best-list').innerHTML = '';
+                document.getElementById('breadth-fake-list').innerHTML = '';
+                document.getElementById('breadth-notes').innerHTML = '<li class="breadth-note">' + esc(issue.leaders) + '</li>';
+                return;
+            }
             panel.style.display = 'block';
             document.getElementById('breadth-summary').textContent = breadthSwing.regime.summary;
             document.getElementById('breadth-regime-copy').textContent = breadthSwing.regime.summary;
